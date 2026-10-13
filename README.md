@@ -54,8 +54,9 @@ retains its parameters, checkout, Maven build, and JAR archiving, then calls `fo
    repository, retaining that layout.
 2. Configure a folder-scoped **Pipeline Library**, or an appropriate global untrusted/sandboxed
    library under **Manage Jenkins > System** (section names vary by Jenkins version).
-3. Name it `fortify-pipeline`, set the default version to the branch containing these changes
-   (initially `main`), and use **Modern SCM > Git** with the repository URL and read credentials.
+3. Name it `fortify-pipeline`, set the default version to the branch containing the root-level `vars/`
+  directory (for pre-merge testing in this repository, `feature/fortify-docker`; switch to `main`
+  after it is merged), and use **Modern SCM > Git** with the repository URL and read credentials.
    Implicit loading is not required; the Jenkinsfile uses `@Library('fortify-pipeline') _`.
 4. For production, publish and select an immutable release tag. Control who can change library
    code or select alternate versions. A globally trusted library grants elevated controller

@@ -108,6 +108,8 @@ check('default lifecycle, SARIF publication, and environment restoration') {
     assert !mock.environment.containsKey('FORTIFY_CI_DIR')
     assert mock.environments[0].DO_AVIATOR_AUDIT == 'false'
     assert mock.environments[0].DO_AVIATOR_REMEDIATIONS == 'false'
+    assert mock.environments[0].FCLI_DATA_DIR == '/workspace/tmp/fortify-ci/data/fcli/v3'
+    assert mock.environments[0].FCLI_STATE_DIR == '/workspace/tmp/fortify-ci/data/fcli/v3/state'
 }
 
 [
