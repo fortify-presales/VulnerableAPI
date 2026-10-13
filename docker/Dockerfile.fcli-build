@@ -1,0 +1,26 @@
+# Build image: fcli + ScanCentral Client (from fortifydocker/fcli) plus JDK and Maven for `scancentral package -bt mvn`.
+ARG FCLI_IMAGE=repo.onfortify.com/docker-public/fortifydocker/fcli:3-ubi9-sc25.4
+FROM ${FCLI_IMAGE}
+
+ARG MAVEN_VERSION=3.9.9
+# Point at a Nexus raw proxy of Apache downloads if the build host has no internet access.
+ARG MAVEN_URL=https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz
+ARG MAVEN_SHA512
+
+USER root
+
+# Point dnf at an internal mirror by adding a .repo file or build args before this step if needed.
+RUN test -n "${MAVEN_SHA512}" \
+ && dnf install -y java-17-openjdk-devel \
+ && dnf clean all \
+ && curl -fsSL "${MAVEN_URL}" -o /tmp/maven.tgz \
+ && echo "${MAVEN_SHA512}  /tmp/maven.tgz" | sha512sum -c - \
+ && mkdir -p /opt/maven \
+ && tar -xzf /tmp/maven.tgz -C /opt/maven --strip-components=1 \
+ && rm /tmp/maven.tgz
+
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk \
+    MAVEN_HOME=/opt/maven \
+    PATH=/opt/maven/bin:${PATH}
+
+USER 10001

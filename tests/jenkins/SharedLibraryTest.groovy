@@ -161,7 +161,25 @@ check('optional integrations bind only required credentials') {
     assert mock.credentialScopes[1]*.credentialsId == ['ssc-ci-token', 'sc-client-auth-token', 'debricked-access-token']
 }
 
+check('preinstalled bootstrap skips npm setup and requires preinstalled tools') {
+    def mock = new JenkinsMock()
+    mock.step().call(appName: 'orders', bootstrap: 'preinstalled', credentials: [repository: 'team-repo'])
+    assert mock.environments[0].PREINSTALLED == 'true'
+    assert mock.environments[0].FORTIFY_BOOTSTRAP == 'preinstalled'
+    assert !mock.commands.any { it.contains('npx -y') }
+    assert mock.commands[0].contains('scancentral --version')
+    assert mock.credentialScopes[0]*.credentialsId == ['team-repo', 'ssc-ci-token', 'sc-client-auth-token']
+}
+
+check('npx bootstrap remains the default') {
+    def mock = new JenkinsMock()
+    mock.step().call(appName: 'orders', exportSarif: false)
+    assert mock.environments[0].PREINSTALLED == 'false'
+    assert mock.commands[0].contains('npx -y')
+}
+
 [
+    [name: 'invalid bootstrap', config: [bootstrap: 'curl'], env: [:]],
     [name: 'unknown setting', config: [typo: true], env: [:]],
     [name: 'missing app', config: [appName: ''], env: [:]],
     [name: 'invalid Boolean', config: [exportSarif: 'false'], env: [:]],

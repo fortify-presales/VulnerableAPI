@@ -37,6 +37,9 @@ the source with ScanCentral Client (`-bt mvn`), submits a ScanCentral SAST scan,
 completion and prints an application version summary. Optionally it exports results to
 SARIF, publishes findings and trends through Warnings NG, and archives the file.
 
+An alternative [Jenkinsfile.docker](Jenkinsfile.docker) runs the same pipeline in a container with fcli, ScanCentral
+Client, JDK and Maven preinstalled instead of using `npx`; see [docs/docker-agent.md](docs/docker-agent.md).
+
 ### Reusable Jenkins Shared Library
 
 The Fortify lifecycle now lives in [vars/fortifyCi.groovy](vars/fortifyCi.groovy), not in each
@@ -135,6 +138,7 @@ Pass credential IDs only, never actual tokens or passwords, in the configuration
 | `scanTimeoutMinutes` | Optional positive integer |
 | `packageExtraOpts`, `scClientVersion` | `-bt mvn`, `auto`; override for the application's build toolchain |
 | `npmRegistry` | `NPM_REGISTRY`, otherwise public npm; this project explicitly supplies Nexus |
+| `bootstrap` | `npx` (default, installs fcli via `@fortify/setup`) or `preinstalled` (fcli and ScanCentral Client already on `PATH`, as in [docker-agent.md](docs/docker-agent.md)) |
 | `setupPackage` | `@fortify/setup@2`; use an approved version |
 | `fcliBootstrapVersion`, `fcliBootstrapUrl`, `toolDefinitions` | Corresponding `FCLI_BOOTSTRAP_VERSION`, `FCLI_BOOTSTRAP_URL`, `TOOL_DEFINITIONS` environment values |
 | `aviatorUrl`, `aviatorApp` | `AVIATOR_URL`, `AVIATOR_APP`; application defaults to `appName` |

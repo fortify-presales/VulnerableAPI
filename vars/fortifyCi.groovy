@@ -60,6 +60,8 @@ def call(Map overrides = [:]) {
         "AVIATOR_REMEDIATIONS_ACTION=${settings.aviatorRemediations ? 'push-remediations' : ''}",
         "AVIATOR_REMEDIATIONS_EXTRA_OPTS=${settings.aviatorRemediations ? '--branch-name "' + remediationBranch + '"' : ''}",
         "FORTIFY_SETUP=${settings.setupPackage}",
+        "FORTIFY_BOOTSTRAP=${settings.bootstrap}",
+        "PREINSTALLED=${settings.bootstrap == 'preinstalled'}",
         "FCLI_BOOTSTRAP_VERSION=${settings.fcliBootstrapVersion ?: ''}",
         "FCLI_BOOTSTRAP_URL=${settings.fcliBootstrapUrl ?: ''}",
         "TOOL_DEFINITIONS=${settings.toolDefinitions ?: ''}",
@@ -93,7 +95,16 @@ def call(Map overrides = [:]) {
     withEnv(environment) {
         try {
             stage('Setup fcli') {
-                withCredentials(repositoryCredentials) {
+                if (settings.bootstrap == 'preinstalled') {
+                    // fcli and ScanCentral Client must already be on PATH, e.g. in a container image
+                    sh '''
+                        set -eu
+                        umask 077
+                        mkdir -p "$FORTIFY_CI_DIR"
+                        fcli --version
+                        scancentral --version
+                    '''
+                } else withCredentials(repositoryCredentials) {
                     sh '''
                         set -eu
                         umask 077
@@ -122,7 +133,7 @@ def call(Map overrides = [:]) {
                 withCredentials(scanCredentials) {
                     sh '''
                         set -eu
-                        . "$FORTIFY_ENV_FILE"
+                        if [ "$FORTIFY_BOOTSTRAP" = npx ]; then . "$FORTIFY_ENV_FILE"; fi
                         fcli action run ci
                     '''
                 }
@@ -132,7 +143,7 @@ def call(Map overrides = [:]) {
                     withCredentials([string(credentialsId: settings.credentials.ssc, variable: 'SSC_TOKEN')]) {
                         sh '''
                             set -eu
-                            . "$FORTIFY_ENV_FILE"
+                            if [ "$FORTIFY_BOOTSTRAP" = npx ]; then . "$FORTIFY_ENV_FILE"; fi
                             fcli ssc session login --url "$SSC_URL" -t "$SSC_TOKEN"
                             trap 'fcli ssc session logout || true' EXIT
                             fcli ssc action run sarif-sast-report --av "$SSC_APPVERSION" -f "$FORTIFY_SARIF_FILE"
@@ -161,7 +172,7 @@ def resolveSettings(Map overrides) {
         appName: null, versionName: env.BRANCH_NAME ?: 'main', sscUrl: env.SSC_URL,
         issueTemplate: env.FORTIFY_ISSUE_TEMPLATE ?: 'Prioritized High Risk Issue Template',
         sensorPool: env.FORTIFY_SENSOR_POOL ?: '', scanPolicy: null, scanTimeoutMinutes: null,
-        packageExtraOpts: '-bt mvn', scClientVersion: 'auto', setupPackage: '@fortify/setup@2',
+        packageExtraOpts: '-bt mvn', scClientVersion: 'auto', setupPackage: '@fortify/setup@2', bootstrap: 'npx',
         npmRegistry: env.NPM_REGISTRY ?: 'https://registry.npmjs.org/',
         fcliBootstrapVersion: env.FCLI_BOOTSTRAP_VERSION, fcliBootstrapUrl: env.FCLI_BOOTSTRAP_URL,
         toolDefinitions: env.TOOL_DEFINITIONS,
@@ -198,6 +209,9 @@ def resolveSettings(Map overrides) {
     }
     if (settings.appName.contains(':') || settings.versionName.contains(':')) {
         error('appName and versionName must not contain the SSC delimiter :')
+    }
+    if (!(settings.bootstrap in ['npx', 'preinstalled'])) {
+        error('bootstrap must be npx or preinstalled')
     }
     ['dastScan', 'waitForDast', 'debrickedScan', 'aviatorAudit', 'aviatorRemediations', 'checkPolicy', 'exportSarif'].each { key ->
         if (!(settings[key] instanceof Boolean)) {
