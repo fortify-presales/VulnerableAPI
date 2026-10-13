@@ -4,7 +4,7 @@ This pattern uses a dedicated Jenkins job to remove the SSC application version 
 pull request. It does not run in the PR build itself: the cleanup pipeline must come from a protected branch and
 must not execute Jenkinsfile code from the PR being closed.
 
-The example Jenkinsfile is [Jenkinsfile.ssc-pr-cleanup](Jenkinsfile.ssc-pr-cleanup). It listens for GitHub
+The example Jenkinsfile is [Jenkinsfile.ssc-pr-cleanup](../examples/jenkins/Jenkinsfile.ssc-pr-cleanup). It listens for GitHub
 `pull_request` events with action `closed`, then maps the PR number to an SSC version such as
 `jenkins-fcli-scancentral:PR-42`.
 
@@ -18,14 +18,15 @@ the example so cleanup targets exactly the version created by the scan job.
 
 ## Jenkins and Webhook Setup
 
-1. Create a dedicated Pipeline job whose script path is `docs/Jenkinsfile.ssc-pr-cleanup` and whose SCM revision
+1. Create a dedicated Pipeline job whose script path is `examples/jenkins/Jenkinsfile.ssc-pr-cleanup` and whose SCM revision
    is the protected `main` branch. Do not run this Jenkinsfile as a multibranch PR job.
-2. Install the **Generic Webhook Trigger** and **Docker Pipeline** plugins. The example uses the Nexus image
-   `repo.onfortify.com/docker-hosted/fcli-build:1`; the agent needs the `linux && docker` label and access to a
-   Docker daemon.
+2. Install the **Generic Webhook Trigger** plugin. The agent needs Node.js/npm and the `linux && node` label; it
+   does not need Docker or the Docker Pipeline plugin.
 3. Configure `SSC_URL` in the job or folder environment. Add Jenkins Secret Text credential `ssc-ci-token` with
-   an SSC identity authorized to delete application versions, plus `nexus-credentials` with read access to the
-   image repository. Add Secret Text credential `ssc-pr-cleanup-webhook-token` for the Generic Webhook Trigger.
+   an SSC identity authorized to delete application versions, plus Username with password credential
+   `nexus-credentials` with read access to the npm mirror. The Jenkinsfile pins `@fortify/setup` to major version
+   2 and fcli to `v3.28.1`; update `FCLI_VERSION` when intentionally upgrading. Add Secret Text credential
+   `ssc-pr-cleanup-webhook-token` for the Generic Webhook Trigger.
 4. Configure a GitHub repository webhook for **Pull requests** and the `closed` action. Authenticate the
    webhook before it reaches the Generic Webhook Trigger endpoint: use a trusted relay that verifies GitHub's
    `X-Hub-Signature-256` and forwards the trigger token, or configure an equivalent signature-verifying ingress.
@@ -54,6 +55,7 @@ Do not race deletion against an in-flight ScanCentral scan. Coordinate the clean
 example by having both jobs acquire the same Lockable Resources lock keyed by application and SSC version, or by
 waiting for that PR's build to finish before allowing the cleanup stage to run.
 
-The example assumes `SSC_URL`, the credential IDs, image address, repository name, and `PR-<number>` version
-convention match your Jenkins and SSC configuration. Update those fixed values in the protected Jenkinsfile when
-deploying it.
+The example assumes `SSC_URL`, the credential IDs, npm mirror, Node agent label, repository name, and `PR-<number>`
+version convention match your Jenkins and SSC configuration. `@fortify/setup` must be able to reach the npm mirror
+and the configured fcli download source (GitHub by default, or an internal mirror). Update those fixed values in
+the protected Jenkinsfile when deploying it.

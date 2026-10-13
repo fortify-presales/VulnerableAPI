@@ -1,13 +1,5 @@
 pipeline {
-    agent {
-        docker {
-            image 'repo.onfortify.com/docker-hosted/fcli-build:1'
-            registryUrl 'https://repo.onfortify.com'
-            registryCredentialsId 'nexus-credentials'
-            label 'linux && docker'
-            args '--entrypoint= -e HOME=/tmp -e FCLI_USER_HOME=/tmp -e JAVA_TOOL_OPTIONS=-Duser.home=/tmp'
-        }
-    }
+    agent { label 'linux && node' }
 
     parameters {
         string(name: 'PR_ACTION', defaultValue: '', description: 'Webhook action')
@@ -43,6 +35,9 @@ pipeline {
         SSC_APP_NAME = 'jenkins-fcli-scancentral'
         EXPECTED_BASE_REPO = 'fortify-presales/jenkins-fcli-scancentral'
         SSC_VERSION_PREFIX = 'PR-'
+        FORTIFY_SETUP = '@fortify/setup@2'
+        FCLI_VERSION = 'v3.28.1'
+        NPM_REGISTRY = 'https://repo.onfortify.com/repository/npm-public/'
     }
 
     stages {
@@ -59,7 +54,38 @@ pipeline {
                         error('Webhook pull request number must be a positive integer')
                     }
                     env.SSC_VERSION_NAME = "${env.SSC_VERSION_PREFIX}${env.PR_NUMBER}"
+                    env.FORTIFY_CI_DIR = "${pwd(tmp: true)}/ssc-pr-cleanup"
+                    env.FORTIFY_DATA_DIR = "${env.FORTIFY_CI_DIR}/data"
+                    env.FCLI_DATA_DIR = "${env.FORTIFY_DATA_DIR}/fcli/v3"
+                    env.FCLI_STATE_DIR = "${env.FCLI_DATA_DIR}/state"
+                    env.FCLI_CONFIG_DIR = "${env.FCLI_DATA_DIR}/config"
+                    env.FCLI_BOOTSTRAP_CACHE_DIR = "${env.FORTIFY_CI_DIR}/bootstrap"
+                    env.FORTIFY_ENV_FILE = "${env.FORTIFY_CI_DIR}/env.sh"
+                    env.NPM_CONFIG_USERCONFIG = "${env.FORTIFY_CI_DIR}/npmrc"
                     echo "SSC cleanup target: ${env.SSC_APP_NAME}:${env.SSC_VERSION_NAME}"
+                }
+            }
+        }
+
+        stage('Bootstrap fcli') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'nexus-credentials',
+                    usernameVariable: 'NEXUS_USERNAME', passwordVariable: 'NEXUS_PASSWORD')]) {
+                    sh '''
+                        set -eu
+                        umask 077
+                        mkdir -p "$FORTIFY_CI_DIR"
+                        set +x
+                        NPM_AUTH=$(printf '%s:%s' "$NEXUS_USERNAME" "$NEXUS_PASSWORD" | base64 | tr -d '\n')
+                        {
+                            printf 'registry=%s\n' "$NPM_REGISTRY"
+                            printf '//%s:_auth=%s\n' "${NPM_REGISTRY#*://}" "$NPM_AUTH"
+                            printf 'always-auth=true\n'
+                        } > "$NPM_CONFIG_USERCONFIG"
+                        unset NPM_AUTH
+                        npx -y "$FORTIFY_SETUP" env init --tools="fcli:$FCLI_VERSION"
+                        npx -y "$FORTIFY_SETUP" env shell > "$FORTIFY_ENV_FILE"
+                    '''
                 }
             }
         }
@@ -72,6 +98,7 @@ pipeline {
                 withCredentials([string(credentialsId: 'ssc-ci-token', variable: 'SSC_TOKEN')]) {
                     sh '''
                         set -eu
+                        . "$FORTIFY_ENV_FILE"
                         fcli ssc session login --url "$SSC_URL" -t "$SSC_TOKEN"
                         trap 'fcli ssc session logout >/dev/null 2>&1 || true' EXIT
 
@@ -98,6 +125,18 @@ pipeline {
 
                         fcli ssc appversion delete "$MATCHED_IDS"
                     '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                if (env.FORTIFY_CI_DIR?.trim()) {
+                    dir(env.FORTIFY_CI_DIR) {
+                        deleteDir()
+                    }
                 }
             }
         }
