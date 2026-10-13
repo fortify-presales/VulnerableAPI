@@ -1,0 +1,105 @@
+pipeline {
+    agent {
+        docker {
+            image 'repo.onfortify.com/docker-hosted/fcli-build:1'
+            registryUrl 'https://repo.onfortify.com'
+            registryCredentialsId 'nexus-credentials'
+            label 'linux && docker'
+            args '--entrypoint= -e HOME=/tmp -e FCLI_USER_HOME=/tmp -e JAVA_TOOL_OPTIONS=-Duser.home=/tmp'
+        }
+    }
+
+    parameters {
+        string(name: 'PR_ACTION', defaultValue: '', description: 'Webhook action')
+        string(name: 'PR_NUMBER', defaultValue: '', description: 'Webhook pull request number')
+        string(name: 'BASE_REPO', defaultValue: '', description: 'Webhook base repository full name')
+        string(name: 'PR_MERGED', defaultValue: '', description: 'Webhook merged value')
+        booleanParam(name: 'MERGED_ONLY', defaultValue: false, description: 'Only clean up versions for merged pull requests')
+        booleanParam(name: 'DRY_RUN', defaultValue: true, description: 'Inspect the target without deleting it')
+    }
+
+    triggers {
+        GenericTrigger(
+            genericVariables: [
+                [key: 'PR_ACTION', value: '$.action'],
+                [key: 'PR_NUMBER', value: '$.number'],
+                [key: 'BASE_REPO', value: '$.repository.full_name'],
+                [key: 'PR_MERGED', value: '$.pull_request.merged']
+            ],
+            causeString: 'GitHub pull request $PR_NUMBER closed',
+            tokenCredentialId: 'ssc-pr-cleanup-webhook-token',
+            printContributedVariables: false,
+            printPostContent: false,
+            regexpFilterText: '$PR_ACTION:$BASE_REPO',
+            regexpFilterExpression: '^closed:fortify-presales/jenkins-fcli-scancentral$'
+        )
+    }
+
+    options {
+        disableConcurrentBuilds()
+    }
+
+    environment {
+        SSC_APP_NAME = 'jenkins-fcli-scancentral'
+        EXPECTED_BASE_REPO = 'fortify-presales/jenkins-fcli-scancentral'
+        SSC_VERSION_PREFIX = 'PR-'
+    }
+
+    stages {
+        stage('Validate and map PR') {
+            steps {
+                script {
+                    if (env.PR_ACTION != 'closed') {
+                        error('Only closed pull request events are accepted')
+                    }
+                    if (env.BASE_REPO != env.EXPECTED_BASE_REPO) {
+                        error('Webhook repository does not match the configured repository')
+                    }
+                    if (!(env.PR_NUMBER ==~ /[1-9][0-9]*/)) {
+                        error('Webhook pull request number must be a positive integer')
+                    }
+                    env.SSC_VERSION_NAME = "${env.SSC_VERSION_PREFIX}${env.PR_NUMBER}"
+                    echo "SSC cleanup target: ${env.SSC_APP_NAME}:${env.SSC_VERSION_NAME}"
+                }
+            }
+        }
+
+        stage('Inspect or delete SSC version') {
+            when {
+                expression { !params.MERGED_ONLY || env.PR_MERGED == 'true' }
+            }
+            steps {
+                withCredentials([string(credentialsId: 'ssc-ci-token', variable: 'SSC_TOKEN')]) {
+                    sh '''
+                        set -eu
+                        fcli ssc session login --url "$SSC_URL" -t "$SSC_TOKEN"
+                        trap 'fcli ssc session logout >/dev/null 2>&1 || true' EXIT
+
+                        MATCHED_IDS=$(fcli ssc appversion list \
+                            --query "application.name=='$SSC_APP_NAME' && name=='$SSC_VERSION_NAME'" \
+                            -o 'expr={id}')
+
+                        if [ -z "$MATCHED_IDS" ]; then
+                            echo "No SSC version found for $SSC_APP_NAME:$SSC_VERSION_NAME; nothing to do"
+                            exit 0
+                        fi
+                        case "$MATCHED_IDS" in
+                            *[!0-9]*)
+                                echo 'Expected exactly one numeric SSC application-version ID' >&2
+                                exit 1
+                                ;;
+                        esac
+
+                        fcli ssc appversion get "$MATCHED_IDS" -o json
+                        if [ "$DRY_RUN" = true ]; then
+                            echo 'Dry run: no SSC data was deleted'
+                            exit 0
+                        fi
+
+                        fcli ssc appversion delete "$MATCHED_IDS"
+                    '''
+                }
+            }
+        }
+    }
+}
