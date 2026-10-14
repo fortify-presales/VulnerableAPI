@@ -9,7 +9,7 @@ internet access to Maven Central, npm, GitHub or `tools.fortify.com`.
 | Download | Default source | Nexus repository | Configured via |
 |---|---|---|---|
 | Maven dependencies | Maven Central | `maven-public` (group/proxy) | [.mvn/settings.xml](../.mvn/settings.xml) + [.mvn/maven.config](../.mvn/maven.config) |
-| `@fortify/setup` (npm) | registry.npmjs.org | `npm-public` (group/proxy) | `NPM_REGISTRY` + job-scoped `.npmrc-ci` in the [Jenkinsfile](../Jenkinsfile) |
+| `@fortify/setup` (npm) | registry.npmjs.org | `npm-public` (group/proxy) | Global `NPM_REGISTRY` (JCasC or Jenkins global properties) |
 | fcli binary | github.com | `github-proxy` (raw proxy) | `FCLI_BOOTSTRAP_URL` |
 | Tool definitions | github.com | `fortify-hosted` (raw hosted, rewritten copy) | `TOOL_DEFINITIONS` |
 | ScanCentral Client | tools.fortify.com | `fortify-tools-proxy` (raw proxy) | URLs inside the rewritten tool definitions |
@@ -52,20 +52,25 @@ Recommendations:
 in this project, including the Maven build run by ScanCentral Client during packaging
 (`-bt mvn`).
 
-The Jenkinsfile binds `nexus-credentials` to these variables in both the **Build** and
-**Fortify ScanCentral SAST** stages. For local builds, export the same variables in your shell.
+The Jenkinsfile binds `nexus-credentials` during **Build** and supplies
+`credentials: [repository: 'nexus-credentials']` to the shared `fortifyCi` step, which binds
+these variables during bootstrap and ScanCentral packaging. For local builds, export the same
+variables in your shell.
 
 ## 4. npm (`@fortify/setup`)
 
-The **Setup fcli** stage writes a job-scoped npm config file (`$WORKSPACE/.npmrc-ci`, referenced
-via `NPM_CONFIG_USERCONFIG`) containing:
+Set the Jenkins global environment variable `NPM_REGISTRY` to
+`https://repo.onfortify.com/repository/npm-public/` (the sample [JCasC config](jenkins-casc.yaml)
+does this). The shared step inherits this value; pass `npmRegistry` to `fortifyCi` only to
+override it for a specific application. The shared **Setup fcli** stage writes a private npm config file in Jenkins' temporary workspace
+directory, referenced via `NPM_CONFIG_USERCONFIG`, containing:
 
 ```ini
 registry=https://repo.onfortify.com/repository/npm-public/
 //repo.onfortify.com/repository/npm-public/:_auth=<base64 user:password>
 ```
 
-The file is created with `umask 077` and deleted in the pipeline's `post` section.
+The file is created with `umask 077` and deleted by the shared step's `finally` cleanup.
 
 ## 5. fcli bootstrap
 

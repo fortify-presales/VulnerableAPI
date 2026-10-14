@@ -1,0 +1,17 @@
+ARG FCLI_IMAGE=repo.onfortify.com/docker-public/fortifydocker/fcli:3-ubi9-sc25.4
+ARG LANGUAGE_IMAGE=node:22-bookworm
+
+FROM ${FCLI_IMAGE} AS fortify-tools
+FROM ${LANGUAGE_IMAGE}
+
+COPY --from=fortify-tools /usr/bin/fcli /usr/local/bin/fcli
+COPY --from=fortify-tools /opt/fortify/sc-client /opt/fortify/sc-client
+
+ENV HOME=/tmp \
+    JAVA_TOOL_OPTIONS=-Duser.home=/tmp \
+    FCLI_USER_HOME=/tmp \
+    SC_CLIENT_HOME=/opt/fortify/sc-client \
+    SC_CLIENT_CMD=/opt/fortify/sc-client/bin/scancentral \
+    PATH=/opt/fortify/sc-client/bin:${PATH}
+
+USER 10001

@@ -12,7 +12,7 @@ Throughout this document, replace `artifactory.example.com` with your Artifactor
 | Download | Default source | Artifactory repository | Configured via |
 |---|---|---|---|
 | Maven dependencies | Maven Central | `maven-virtual` (virtual → `maven-remote`) | [.mvn/settings.xml](../.mvn/settings.xml) + [.mvn/maven.config](../.mvn/maven.config) |
-| `@fortify/setup` (npm) | registry.npmjs.org | `npm-virtual` (virtual → `npm-remote`) | `NPM_REGISTRY` + job-scoped `.npmrc-ci` in the [Jenkinsfile](../Jenkinsfile) |
+| `@fortify/setup` (npm) | registry.npmjs.org | `npm-virtual` (virtual → `npm-remote`) | Global `NPM_REGISTRY` (JCasC or Jenkins global properties) |
 | fcli binary | github.com | `github-remote` (generic remote) | `FCLI_BOOTSTRAP_URL` |
 | Tool definitions | github.com | `fortify-local` (generic local, rewritten copy) | `TOOL_DEFINITIONS` |
 | ScanCentral Client | tools.fortify.com | `fortify-tools-remote` (generic remote) | URLs inside the rewritten tool definitions |
@@ -80,24 +80,30 @@ the ids matching, or rename both to `artifactory` and adjust the environment var
 [.mvn/maven.config](../.mvn/maven.config) applies these settings to every `mvn` invocation in this
 project, including the Maven build run by ScanCentral Client during packaging (`-bt mvn`).
 
-In the Jenkinsfile, bind `artifactory-credentials` to the variables used by `settings.xml` in the
-**Build**, **Setup fcli** and **Fortify ScanCentral SAST** stages, for example:
+In the Jenkinsfile's **Build** stage, bind `artifactory-credentials` to the variables used by
+`settings.xml`, for example:
 
 ```groovy
 usernamePassword(credentialsId: 'artifactory-credentials', usernameVariable: 'NEXUS_USERNAME', passwordVariable: 'NEXUS_PASSWORD')
 ```
 
+Pass `credentials: [repository: 'artifactory-credentials']` to `fortifyCi` for bootstrap and
+ScanCentral packaging. The `fortifyPipeline` wrapper binds that same ID during build steps too.
+
 ## 4. npm (`@fortify/setup`)
 
-Set the registry in the Jenkinsfile `environment` block:
+Set the Jenkins global environment variable `NPM_REGISTRY` to the Artifactory virtual repository URL.
+The shared step inherits this value; pass `npmRegistry` only when an application needs a different
+registry:
 
 ```groovy
-NPM_REGISTRY = 'https://artifactory.example.com/artifactory/api/npm/npm-virtual/'
+npmRegistry: 'https://artifactory.example.com/artifactory/api/npm/npm-virtual/'
 ```
 
-The **Setup fcli** stage writes a job-scoped npm config file (`$WORKSPACE/.npmrc-ci`, referenced via
-`NPM_CONFIG_USERCONFIG`) with the registry and a base64-encoded `user:token` `_auth` entry scoped to
-that registry. The file is created with `umask 077` and deleted in the pipeline's `post` section.
+The shared **Setup fcli** stage writes a private npm config file in Jenkins' temporary workspace
+directory, referenced via `NPM_CONFIG_USERCONFIG`, with the registry and a base64-encoded
+`user:token` `_auth` entry scoped to that registry. The file is created with `umask 077` and
+deleted by the shared step's `finally` cleanup.
 No additional Artifactory configuration is needed; Artifactory accepts basic `_auth` for npm.
 
 ## 5. fcli bootstrap
