@@ -1,5 +1,13 @@
 import java.util.regex.Pattern
 
+class JenkinsBuildMock {
+    List causes
+
+    JenkinsBuildMock(List causes) { this.causes = causes }
+
+    List getBuildCauses() { causes }
+}
+
 class JenkinsMock {
     Map environment = [SSC_URL: 'https://ssc.example.com', BRANCH_NAME: 'main',
                        BUILD_TAG: 'jenkins-test-main-42', BUILD_NUMBER: '42']
@@ -15,10 +23,11 @@ class JenkinsMock {
     Map parameters = [:]
     Binding binding
 
-    JenkinsMock(Map additionalEnvironment = [:]) {
+    JenkinsMock(Map additionalEnvironment = [:], List buildCauses = []) {
         environment.putAll(additionalEnvironment)
         binding = new Binding([
             env: environment, scm: 'test-scm', params: parameters,
+            currentBuild: new JenkinsBuildMock(buildCauses),
             error: { message -> throw new IllegalArgumentException(message.toString()) },
             pwd: { options -> '/workspace/tmp' },
             withEnv: { values, body ->
@@ -129,6 +138,17 @@ check('PR comments default on for change requests and remain overridable') {
     def disabledMock = new JenkinsMock([BRANCH_NAME: 'PR-42', CHANGE_ID: '42'])
     disabledMock.step().call(appName: 'orders', exportSarif: false, doPrComment: false)
     assert disabledMock.environments[0].DO_PR_COMMENT == 'false'
+}
+
+check('closed pull request builds skip Fortify work') {
+    def mock = new JenkinsMock([BRANCH_NAME: 'PR-2', CHANGE_ID: '2'], [
+        [shortDescription: 'Pull request #2 closed at 4:48:22 PM on Oct 14, 2026']
+    ])
+    def result = mock.step().call(appName: 'orders')
+    assert result == [skipped: true, reason: 'closed-pull-request']
+    assert mock.stages.empty
+    assert mock.commands.empty
+    assert mock.credentialScopes.empty
 }
 
 check('application can override default fcli action flags') {

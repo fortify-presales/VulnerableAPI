@@ -1,4 +1,13 @@
 def call(Map overrides = [:]) {
+    def closedPullRequestBuild = (currentBuild.getBuildCauses() ?: []).any { cause ->
+        def description = cause.shortDescription?.toString() ?: ''
+        description ==~ /(?i)pull request #\d+ closed\b.*/
+    }
+    if (closedPullRequestBuild) {
+        echo('Skipping Fortify CI for a closed pull request build')
+        return [skipped: true, reason: 'closed-pull-request']
+    }
+
     def settings = resolveSettings(overrides)
     def scanBranch = env.CHANGE_BRANCH ?: env.BRANCH_NAME ?: 'main'
     def featureBranch = scanBranch.startsWith('feature/')

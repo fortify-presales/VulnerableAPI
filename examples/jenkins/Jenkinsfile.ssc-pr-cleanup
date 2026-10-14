@@ -45,8 +45,11 @@ pipeline {
             steps {
                 script {
                     if (env.PR_ACTION != 'closed') {
-                        error('Only closed pull request events are accepted')
+                        echo('Ignoring webhook event; SSC cleanup only handles closed pull requests')
+                        env.SSC_CLEANUP_SKIP = 'true'
+                        return
                     }
+                    env.SSC_CLEANUP_SKIP = 'false'
                     if (env.BASE_REPO != env.EXPECTED_BASE_REPO) {
                         error('Webhook repository does not match the configured repository')
                     }
@@ -68,6 +71,9 @@ pipeline {
         }
 
         stage('Bootstrap fcli') {
+            when {
+                expression { env.SSC_CLEANUP_SKIP != 'true' }
+            }
             steps {
                 withCredentials([usernamePassword(credentialsId: 'nexus-credentials',
                     usernameVariable: 'NEXUS_USERNAME', passwordVariable: 'NEXUS_PASSWORD')]) {
@@ -92,7 +98,9 @@ pipeline {
 
         stage('Inspect or delete SSC version') {
             when {
-                expression { !params.MERGED_ONLY || env.PR_MERGED == 'true' }
+                expression {
+                    env.SSC_CLEANUP_SKIP != 'true' && (!params.MERGED_ONLY || env.PR_MERGED == 'true')
+                }
             }
             steps {
                 withCredentials([string(credentialsId: 'ssc-ci-token', variable: 'SSC_TOKEN')]) {

@@ -32,8 +32,9 @@ the example so cleanup targets exactly the version created by the scan job.
    `X-Hub-Signature-256` and forwards the trigger token, or configure an equivalent signature-verifying ingress.
    Keep the Jenkins trigger token out of source control and do not expose an unauthenticated trigger endpoint.
 5. Run the job once so Jenkins applies the Pipeline trigger configuration. The trigger extracts `action`, PR
-   `number`, base repository full name, and `pull_request.merged`; it filters to closed PRs for
-   `fortify-presales/jenkins-fcli-scancentral`. The Jenkinsfile repeats these checks before contacting SSC.
+   `number`, base repository full name, and `pull_request.merged`; its regexp filter targets closed PRs for
+   `fortify-presales/jenkins-fcli-scancentral`. The Jenkinsfile also ignores non-closed payloads that reach the
+   job and validates the repository and PR number before contacting SSC.
 
 The Generic Webhook Trigger token can cause the job to run with Jenkins `SYSTEM` authority. Treat the endpoint
 and token as privileged: restrict access to the signed webhook relay, keep the Jenkinsfile on protected `main`,
