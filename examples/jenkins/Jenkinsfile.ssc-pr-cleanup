@@ -7,7 +7,7 @@ pipeline {
         string(name: 'BASE_REPO', defaultValue: '', description: 'Webhook base repository full name')
         string(name: 'PR_MERGED', defaultValue: '', description: 'Webhook merged value')
         booleanParam(name: 'MERGED_ONLY', defaultValue: false, description: 'Only clean up versions for merged pull requests')
-        booleanParam(name: 'DRY_RUN', defaultValue: true, description: 'Inspect the target without deleting it')
+        booleanParam(name: 'DRY_RUN', defaultValue: false, description: 'Preview the target without deleting it')
     }
 
     triggers {

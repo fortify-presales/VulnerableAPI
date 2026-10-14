@@ -39,17 +39,18 @@ The Generic Webhook Trigger token can cause the job to run with Jenkins `SYSTEM`
 and token as privileged: restrict access to the signed webhook relay, keep the Jenkinsfile on protected `main`,
 and do not grant the cleanup job unrelated credentials.
 
-## Preview and Enable Deletion
+## Deletion Behavior
 
-The example defaults `DRY_RUN` to true. A dry run logs in, resolves the exact application/version pair to a
-numeric SSC version ID, and prints that version's JSON without deleting it. The query requires both the configured
-application name and the expected PR version name; no match is a no-op, and output other than one numeric ID fails
-closed. The actual delete uses that numeric ID.
+The example defaults `DRY_RUN` to false, so a matching version is deleted when its PR closes. Before enabling the
+webhook, run the job manually with `DRY_RUN` checked to preview the target: it resolves the exact
+application/version pair to a numeric SSC version ID and prints that version's JSON without deleting it. The query
+requires both the configured application name and expected PR version name; no match is a no-op, and output other
+than one numeric ID fails closed. Actual deletion uses that numeric ID.
 
-After verifying several closed-PR dry runs, deliberately change the `DRY_RUN` default to false to enable
-automatic deletion. Set `MERGED_ONLY` to true if versions should be removed only for merged PRs; by default the
-example handles both merged and unmerged closures. Deleting an SSC application version permanently removes its
-artifacts and issues. Reopening a PR can cause a later scan to create its SSC version again.
+Set `DRY_RUN` to true for any run that should only inspect the target. Set `MERGED_ONLY` to true if versions
+should be removed only for merged PRs; by default the example handles both merged and unmerged closures. Deleting
+an SSC application version permanently removes its artifacts and issues. Reopening a PR can cause a later scan to
+create its SSC version again.
 
 Do not race deletion against an in-flight ScanCentral scan. Coordinate the cleanup with the PR scan job, for
 example by having both jobs acquire the same Lockable Resources lock keyed by application and SSC version, or by

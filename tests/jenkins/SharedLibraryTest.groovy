@@ -120,6 +120,17 @@ check('default lifecycle, SARIF publication, and environment restoration') {
     assert mock.environments[0].FCLI_STATE_DIR == '/workspace/tmp/fortify-ci/data/fcli/v3/state'
 }
 
+check('PR comments default on for change requests and remain overridable') {
+    def prMock = new JenkinsMock([BRANCH_NAME: 'PR-42', CHANGE_ID: '42'])
+    prMock.step().call(appName: 'orders', exportSarif: false)
+    assert prMock.environments[0].SSC_APPVERSION == 'orders:PR-42'
+    assert prMock.environments[0].DO_PR_COMMENT == 'true'
+
+    def disabledMock = new JenkinsMock([BRANCH_NAME: 'PR-42', CHANGE_ID: '42'])
+    disabledMock.step().call(appName: 'orders', exportSarif: false, doPrComment: false)
+    assert disabledMock.environments[0].DO_PR_COMMENT == 'false'
+}
+
 check('application can override default fcli action flags') {
     def mock = new JenkinsMock()
     mock.step().call(appName: 'orders', exportSarif: false,

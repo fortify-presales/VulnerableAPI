@@ -147,7 +147,8 @@ Pass credential IDs only, never actual tokens or passwords, in the configuration
 | `dastScan`, `waitForDast`, `debrickedScan` | Boolean, default false |
 | `aviatorAudit`, `aviatorRemediations`, `checkPolicy` | Boolean, default false; remediations require and enable auditing |
 | `doSetup`, `doSastScan`, `doWait`, `doSastWait`, `doAppVersionSummary` | Boolean action flags, default true |
-| `doSastExport`, `doDebrickedExport`, `doPrComment` | Boolean action flags, default false |
+| `doSastExport`, `doDebrickedExport` | Boolean action flags, default false |
+| `doPrComment` | Defaults true when Jenkins sets `CHANGE_ID` for a PR build; otherwise false. Pass an explicit Boolean to override. The fcli comment feature is preview functionality. |
 | `exportSarif`, `sarifFile` | true, `fortify-sast.sarif`; file name only, no directory traversal |
 | `credentials` | Jenkins credential ID map described below |
 
