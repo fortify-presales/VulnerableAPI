@@ -62,7 +62,6 @@ pipeline {
                     aviatorRemediations: params.ENABLE_AVIATOR_REMEDIATIONS,
                     checkPolicy: params.ENABLE_CHECK_POLICY,
                     exportSarif: params.EXPORT_SARIF,
-                    npmRegistry: 'https://repo.onfortify.com/repository/npm-public/',
                     credentials: [repository: 'nexus-credentials']
                 )
             }

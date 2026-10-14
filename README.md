@@ -104,7 +104,6 @@ fortifyPipeline(
   appName: 'orders-service',
   agentLabel: 'linux && java',
   sensorPool: 'linux-standard',
-  npmRegistry: 'https://repo.onfortify.com/repository/npm-public/',
   credentials: [repository: 'nexus-credentials'],
   artifacts: 'target/*.jar'
 ) {
@@ -134,11 +133,12 @@ Pass credential IDs only, never actual tokens or passwords, in the configuration
 | `versionName` | `BRANCH_NAME`, or `main` outside multibranch jobs |
 | `sscUrl` | `SSC_URL`; required |
 | `issueTemplate` | `FORTIFY_ISSUE_TEMPLATE`, otherwise `Prioritized High Risk Issue Template` |
+| `parentBranch` | `FORTIFY_PARENT_BRANCH`, otherwise `main`; feature branches copy from `<appName>:<parentBranch>` |
 | `sensorPool` | `FORTIFY_SENSOR_POOL`, otherwise empty/server-side selection |
 | `scanPolicy` | Branch-derived; explicit `security` or `classic` can strengthen feature scans; `devops` is rejected on non-feature branches |
 | `scanTimeoutMinutes` | Optional positive integer |
 | `packageExtraOpts`, `scClientVersion` | `-bt mvn`, `auto`; override for the application's build toolchain |
-| `npmRegistry` | `NPM_REGISTRY`, otherwise public npm; this project explicitly supplies Nexus |
+| `npmRegistry` | `NPM_REGISTRY`, otherwise public npm; set globally for a shared mirror, or pass explicitly for an application-specific registry |
 | `bootstrap` | `npx` (default, installs fcli via `@fortify/setup`) or `preinstalled` (fcli and ScanCentral Client already on `PATH`, as in [docker-agent.md](docs/docker-agent.md)) |
 | `setupPackage` | `@fortify/setup@2`; use an approved version |
 | `fcliBootstrapVersion`, `fcliBootstrapUrl`, `toolDefinitions` | Corresponding `FCLI_BOOTSTRAP_VERSION`, `FCLI_BOOTSTRAP_URL`, `TOOL_DEFINITIONS` environment values |
@@ -146,6 +146,8 @@ Pass credential IDs only, never actual tokens or passwords, in the configuration
 | `dastSettings` | Numeric scan-settings ID when DAST is enabled |
 | `dastScan`, `waitForDast`, `debrickedScan` | Boolean, default false |
 | `aviatorAudit`, `aviatorRemediations`, `checkPolicy` | Boolean, default false; remediations require and enable auditing |
+| `doSetup`, `doSastScan`, `doWait`, `doSastWait`, `doAppVersionSummary` | Boolean action flags, default true |
+| `doSastExport`, `doDebrickedExport`, `doPrComment` | Boolean action flags, default false |
 | `exportSarif`, `sarifFile` | true, `fortify-sast.sarif`; file name only, no directory traversal |
 | `credentials` | Jenkins credential ID map described below |
 
@@ -210,11 +212,11 @@ registered library on Jenkins before rolling it out to other applications.
   Keep the environment file outside source control and restrict its permissions. For Docker or Kubernetes, mount the JCasC file into the controller and provide secret variables through its deployment secret mechanism. A repository path works only if it is accessible from the controller.
 5. Restart Jenkins after changing its service environment. In **Manage Jenkins > Configuration as Code**, review load errors, then verify the credential IDs under **Manage Jenkins > Credentials**.
 
-The sample configures `SSC_URL`, `AVIATOR_URL`, `FCLI_BOOTSTRAP_VERSION`, and the credential IDs used by the pipeline. `FCLI_BOOTSTRAP_VERSION` is optional; `@fortify/setup` defaults to the latest fcli v3 release.
+The sample configures `SSC_URL`, `AVIATOR_URL`, `FCLI_BOOTSTRAP_VERSION`, `NPM_REGISTRY`, `FORTIFY_PARENT_BRANCH`, and the credential IDs used by the pipeline. Feature branches copy from the configured parent branch (default `main`). `FCLI_BOOTSTRAP_VERSION` is optional; `@fortify/setup` defaults to the latest fcli v3 release.
 
 ### Configure Jenkins without JCasC
 
-1. In **Manage Jenkins > System > Global properties > Environment variables**, set `SSC_URL`. Set `AVIATOR_URL` only if an Aviator feature will be enabled. `FCLI_BOOTSTRAP_VERSION` is optional and defaults to the latest fcli v3 release.
+1. In **Manage Jenkins > System > Global properties > Environment variables**, set `SSC_URL` and, when using a private npm mirror, `NPM_REGISTRY` (for example, `https://repo.onfortify.com/repository/npm-public/`). Set `FORTIFY_PARENT_BRANCH` if feature branches copy from a branch other than `main`. Set `AVIATOR_URL` only if an Aviator feature will be enabled. `FCLI_BOOTSTRAP_VERSION` is optional and defaults to the latest fcli v3 release.
 2. In **Manage Jenkins > Credentials**, create credentials with these exact IDs and types:
   - Required Secret text: `ssc-ci-token` (SSC CIToken) and `sc-client-auth-token` (ScanCentral SAST client auth token).
   - Required Username with password: `nexus-credentials` (Nexus credentials for Maven and npm).
@@ -247,10 +249,11 @@ the mirror. The definitions ZIP must contain rewritten absolute tool download UR
 to byte-identical mirrored artifacts; merely proxying the original ZIP does not redirect
 tool downloads. Do not embed credentials in URLs.
 
-The current Jenkinsfile routes npm through Nexus, but fcli and supporting tools still use
-public sources unless these additional mirrors are configured. The explicit `npmRegistry`
-argument in the Jenkinsfile overrides a global `NPM_REGISTRY` value. For a different repository
-manager, update that argument and the Maven mirror in [.mvn/settings.xml](.mvn/settings.xml).
+The JCasC sample sets `NPM_REGISTRY` to the Nexus npm group, and the shared step inherits that
+controller-level value. Without a global value, it uses public npm. Pass `npmRegistry` to
+`fortifyCi` only when one application needs a different registry. fcli and supporting tools still
+use public sources unless the additional mirrors are configured. For a different repository
+manager, set the global registry and update the Maven mirror in [.mvn/settings.xml](.mvn/settings.xml).
 Follow [the Nexus guide](docs/nexus-mirroring.md) or
 [the Artifactory guide](docs/artifactory-mirroring.md) for repository provisioning and validation.
 

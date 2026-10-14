@@ -108,8 +108,31 @@ check('default lifecycle, SARIF publication, and environment restoration') {
     assert !mock.environment.containsKey('FORTIFY_CI_DIR')
     assert mock.environments[0].DO_AVIATOR_AUDIT == 'false'
     assert mock.environments[0].DO_AVIATOR_REMEDIATIONS == 'false'
+    assert mock.environments[0].DO_SETUP == 'true'
+    assert mock.environments[0].DO_SAST_SCAN == 'true'
+    assert mock.environments[0].DO_WAIT == 'true'
+    assert mock.environments[0].DO_SAST_WAIT == 'true'
+    assert mock.environments[0].DO_APPVERSION_SUMMARY == 'true'
+    assert mock.environments[0].DO_SAST_EXPORT == 'false'
+    assert mock.environments[0].DO_DEBRICKED_EXPORT == 'false'
+    assert mock.environments[0].DO_PR_COMMENT == 'false'
     assert mock.environments[0].FCLI_DATA_DIR == '/workspace/tmp/fortify-ci/data/fcli/v3'
     assert mock.environments[0].FCLI_STATE_DIR == '/workspace/tmp/fortify-ci/data/fcli/v3/state'
+}
+
+check('application can override default fcli action flags') {
+    def mock = new JenkinsMock()
+    mock.step().call(appName: 'orders', exportSarif: false,
+        doSetup: false, doSastScan: false, doWait: false, doSastWait: false,
+        doAppVersionSummary: false, doSastExport: true, doDebrickedExport: true, doPrComment: true)
+    assert mock.environments[0].DO_SETUP == 'false'
+    assert mock.environments[0].DO_SAST_SCAN == 'false'
+    assert mock.environments[0].DO_WAIT == 'false'
+    assert mock.environments[0].DO_SAST_WAIT == 'false'
+    assert mock.environments[0].DO_APPVERSION_SUMMARY == 'false'
+    assert mock.environments[0].DO_SAST_EXPORT == 'true'
+    assert mock.environments[0].DO_DEBRICKED_EXPORT == 'true'
+    assert mock.environments[0].DO_PR_COMMENT == 'true'
 }
 
 [
@@ -125,18 +148,32 @@ check('default lifecycle, SARIF publication, and environment restoration') {
         mock.step().call(appName: 'orders', exportSarif: false, sensorPool: ' Linux Pool ', scanTimeoutMinutes: 60)
         assert mock.tokens(mock.environments[0].SAST_SCAN_EXTRA_OPTS) ==
             ['--pool', 'Linux Pool', '--scan-timeout=60', '--sargs', "-scan-policy ${scenario.policy}".toString()]
+        def expectedSetupOptions = '--issue-template "Prioritized High Risk Issue Template"'
+        if (scenario.policy == 'devops') {
+            expectedSetupOptions += ' --copy-from "orders:main"'
+        }
+        assert mock.environments[0].SETUP_EXTRA_OPTS == expectedSetupOptions
         assert mock.reports.empty
     }
 }
 
+check('feature version copies from configured parent branch') {
+    def mock = new JenkinsMock([BRANCH_NAME: 'feature/login', FORTIFY_PARENT_BRANCH: 'develop'])
+    mock.step().call(appName: 'orders', exportSarif: false)
+    assert mock.environments[0].SETUP_EXTRA_OPTS ==
+        '--issue-template "Prioritized High Risk Issue Template" --copy-from "orders:develop"'
+}
+
 check('per-application settings and partial credential overrides') {
-    def mock = new JenkinsMock([FORTIFY_SENSOR_POOL: 'global-pool', FORTIFY_ISSUE_TEMPLATE: 'global-template'])
+    def mock = new JenkinsMock([FORTIFY_SENSOR_POOL: 'global-pool', FORTIFY_ISSUE_TEMPLATE: 'global-template',
+                                NPM_REGISTRY: 'https://global.example.com/npm/'])
     mock.step().call(appName: 'orders', versionName: 'v1', issueTemplate: 'Team Template',
         sensorPool: 'team-pool', npmRegistry: 'https://repo.example.com/npm/',
         credentials: [ssc: 'team-ssc', repository: 'team-repo'])
     assert mock.environments[0].SSC_APPVERSION == 'orders:v1'
     assert mock.environments[0].SETUP_EXTRA_OPTS == '--issue-template "Team Template"'
     assert mock.environments[0].FORTIFY_REPOSITORY_AUTH == 'true'
+    assert mock.environments[0].NPM_REGISTRY == 'https://repo.example.com/npm/'
     assert mock.credentialScopes[0][0].credentialsId == 'team-repo'
     assert mock.credentialScopes[1]*.credentialsId == ['team-repo', 'team-ssc', 'sc-client-auth-token']
 }
@@ -185,8 +222,10 @@ check('npx bootstrap remains the default') {
     [name: 'unknown setting', config: [typo: true], env: [:]],
     [name: 'missing app', config: [appName: ''], env: [:]],
     [name: 'invalid Boolean', config: [exportSarif: 'false'], env: [:]],
+    [name: 'invalid fcli action Boolean', config: [doSastScan: 'false'], env: [:]],
     [name: 'pool argument injection', config: [sensorPool: 'linux" --pool main'], env: [:]],
     [name: 'issue-template argument injection', config: [issueTemplate: 'bad" --copy main'], env: [:]],
+    [name: 'parent-branch argument injection', config: [parentBranch: 'main" --skip-if-exists'], env: [:]],
     [name: 'SSC delimiter in app', config: [appName: 'orders:main'], env: [:]],
     [name: 'unsafe SARIF path', config: [sarifFile: '../report.sarif'], env: [:]],
     [name: 'non-feature policy downgrade', config: [scanPolicy: 'devops'], env: [:]],
@@ -247,7 +286,7 @@ check('wrapper default build and disabled artifact archiving') {
 }
 
 check('application pipeline delegates to the library with existing parameters') {
-    def mock = new JenkinsMock()
+    def mock = new JenkinsMock([NPM_REGISTRY: 'https://repo.onfortify.com/repository/npm-public/'])
     def consumer = new File('Jenkinsfile').text.replaceFirst(/(?m)^@Library[^\r\n]*\r?\n/, '')
     new GroovyShell(mock.binding).evaluate(consumer)
     assert mock.commands.contains('mvn -B clean verify')

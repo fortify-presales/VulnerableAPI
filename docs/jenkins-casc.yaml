@@ -8,6 +8,10 @@ jenkins:
             value: "https://aviator.example.com"
           - key: FCLI_BOOTSTRAP_VERSION
             value: "v3"
+          - key: NPM_REGISTRY
+            value: "https://repo.onfortify.com/repository/npm-public/"
+          - key: FORTIFY_PARENT_BRANCH
+            value: "main"
 credentials:
   system:
     domainCredentials:

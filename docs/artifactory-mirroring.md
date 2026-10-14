@@ -12,7 +12,7 @@ Throughout this document, replace `artifactory.example.com` with your Artifactor
 | Download | Default source | Artifactory repository | Configured via |
 |---|---|---|---|
 | Maven dependencies | Maven Central | `maven-virtual` (virtual → `maven-remote`) | [.mvn/settings.xml](../.mvn/settings.xml) + [.mvn/maven.config](../.mvn/maven.config) |
-| `@fortify/setup` (npm) | registry.npmjs.org | `npm-virtual` (virtual → `npm-remote`) | `NPM_REGISTRY` + job-scoped `.npmrc-ci` in the [Jenkinsfile](../Jenkinsfile) |
+| `@fortify/setup` (npm) | registry.npmjs.org | `npm-virtual` (virtual → `npm-remote`) | Global `NPM_REGISTRY` (JCasC or Jenkins global properties) |
 | fcli binary | github.com | `github-remote` (generic remote) | `FCLI_BOOTSTRAP_URL` |
 | Tool definitions | github.com | `fortify-local` (generic local, rewritten copy) | `TOOL_DEFINITIONS` |
 | ScanCentral Client | tools.fortify.com | `fortify-tools-remote` (generic remote) | URLs inside the rewritten tool definitions |
@@ -92,7 +92,9 @@ ScanCentral packaging. The `fortifyPipeline` wrapper binds that same ID during b
 
 ## 4. npm (`@fortify/setup`)
 
-Set the shared step's registry argument:
+Set the Jenkins global environment variable `NPM_REGISTRY` to the Artifactory virtual repository URL.
+The shared step inherits this value; pass `npmRegistry` only when an application needs a different
+registry:
 
 ```groovy
 npmRegistry: 'https://artifactory.example.com/artifactory/api/npm/npm-virtual/'

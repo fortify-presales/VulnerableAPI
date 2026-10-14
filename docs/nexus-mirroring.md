@@ -9,7 +9,7 @@ internet access to Maven Central, npm, GitHub or `tools.fortify.com`.
 | Download | Default source | Nexus repository | Configured via |
 |---|---|---|---|
 | Maven dependencies | Maven Central | `maven-public` (group/proxy) | [.mvn/settings.xml](../.mvn/settings.xml) + [.mvn/maven.config](../.mvn/maven.config) |
-| `@fortify/setup` (npm) | registry.npmjs.org | `npm-public` (group/proxy) | `NPM_REGISTRY` + job-scoped `.npmrc-ci` in the [Jenkinsfile](../Jenkinsfile) |
+| `@fortify/setup` (npm) | registry.npmjs.org | `npm-public` (group/proxy) | Global `NPM_REGISTRY` (JCasC or Jenkins global properties) |
 | fcli binary | github.com | `github-proxy` (raw proxy) | `FCLI_BOOTSTRAP_URL` |
 | Tool definitions | github.com | `fortify-hosted` (raw hosted, rewritten copy) | `TOOL_DEFINITIONS` |
 | ScanCentral Client | tools.fortify.com | `fortify-tools-proxy` (raw proxy) | URLs inside the rewritten tool definitions |
@@ -59,8 +59,10 @@ variables in your shell.
 
 ## 4. npm (`@fortify/setup`)
 
-Pass `npmRegistry: 'https://repo.onfortify.com/repository/npm-public/'` to `fortifyCi`.
-The shared **Setup fcli** stage writes a private npm config file in Jenkins' temporary workspace
+Set the Jenkins global environment variable `NPM_REGISTRY` to
+`https://repo.onfortify.com/repository/npm-public/` (the sample [JCasC config](jenkins-casc.yaml)
+does this). The shared step inherits this value; pass `npmRegistry` to `fortifyCi` only to
+override it for a specific application. The shared **Setup fcli** stage writes a private npm config file in Jenkins' temporary workspace
 directory, referenced via `NPM_CONFIG_USERCONFIG`, containing:
 
 ```ini

@@ -3,6 +3,10 @@ def call(Map overrides = [:]) {
     def scanBranch = env.CHANGE_BRANCH ?: env.BRANCH_NAME ?: 'main'
     def featureBranch = scanBranch.startsWith('feature/')
     def scanPolicy = settings.scanPolicy ?: (featureBranch ? 'devops' : 'security')
+    def setupOptions = "--issue-template \"${settings.issueTemplate}\""
+    if (featureBranch) {
+        setupOptions += " --copy-from \"${settings.appName}:${settings.parentBranch}\""
+    }
     if (!(scanPolicy in ['devops', 'security', 'classic']) || (!featureBranch && scanPolicy == 'devops')) {
         error('Use Security or Classic on non-feature branches; supported policies are devops, security, and classic')
     }
@@ -41,16 +45,16 @@ def call(Map overrides = [:]) {
         "DAST_SETTINGS=${settings.dastSettings ?: ''}",
         "PACKAGE_EXTRA_OPTS=${settings.packageExtraOpts}",
         "SC_CLIENT_VERSION=${settings.scClientVersion}",
-        "SETUP_EXTRA_OPTS=--issue-template \"${settings.issueTemplate}\"",
+        "SETUP_EXTRA_OPTS=${setupOptions}",
         "SAST_SCAN_EXTRA_OPTS=${scanOptions.join(' ')}",
-        'DO_SETUP=true',
-        'DO_SAST_SCAN=true',
-        'DO_WAIT=true',
-        'DO_SAST_WAIT=true',
-        'DO_APPVERSION_SUMMARY=true',
-        'DO_SAST_EXPORT=false',
-        'DO_DEBRICKED_EXPORT=false',
-        'DO_PR_COMMENT=false',
+        "DO_SETUP=${settings.doSetup}",
+        "DO_SAST_SCAN=${settings.doSastScan}",
+        "DO_WAIT=${settings.doWait}",
+        "DO_SAST_WAIT=${settings.doSastWait}",
+        "DO_APPVERSION_SUMMARY=${settings.doAppVersionSummary}",
+        "DO_SAST_EXPORT=${settings.doSastExport}",
+        "DO_DEBRICKED_EXPORT=${settings.doDebrickedExport}",
+        "DO_PR_COMMENT=${settings.doPrComment}",
         "DO_DAST_SCAN=${settings.dastScan}",
         "DO_DAST_WAIT=${settings.waitForDast}",
         "DO_DEBRICKED_SCAN=${settings.debrickedScan}",
@@ -172,12 +176,15 @@ def resolveSettings(Map overrides) {
     def defaults = [
         appName: null, versionName: env.BRANCH_NAME ?: 'main', sscUrl: env.SSC_URL,
         issueTemplate: env.FORTIFY_ISSUE_TEMPLATE ?: 'Prioritized High Risk Issue Template',
+        parentBranch: env.FORTIFY_PARENT_BRANCH ?: 'main',
         sensorPool: env.FORTIFY_SENSOR_POOL ?: '', scanPolicy: null, scanTimeoutMinutes: null,
         packageExtraOpts: '-bt mvn', scClientVersion: 'auto', setupPackage: '@fortify/setup@2', bootstrap: 'npx',
         npmRegistry: env.NPM_REGISTRY ?: 'https://registry.npmjs.org/',
         fcliBootstrapVersion: env.FCLI_BOOTSTRAP_VERSION, fcliBootstrapUrl: env.FCLI_BOOTSTRAP_URL,
         toolDefinitions: env.TOOL_DEFINITIONS,
         aviatorUrl: env.AVIATOR_URL, aviatorApp: env.AVIATOR_APP,
+        doSetup: true, doSastScan: true, doWait: true, doSastWait: true,
+        doAppVersionSummary: true, doSastExport: false, doDebrickedExport: false, doPrComment: false,
         dastSettings: '', dastScan: false, waitForDast: false, debrickedScan: false,
         aviatorAudit: false, aviatorRemediations: false, checkPolicy: false,
         exportSarif: true, sarifFile: 'fortify-sast.sarif',
@@ -197,7 +204,7 @@ def resolveSettings(Map overrides) {
     }
     def settings = defaults + overrides
     settings.credentials = defaults.credentials + credentialOverrides
-    ['appName', 'versionName', 'sscUrl', 'issueTemplate', 'npmRegistry', 'scClientVersion', 'setupPackage'].each { key ->
+    ['appName', 'versionName', 'sscUrl', 'issueTemplate', 'parentBranch', 'npmRegistry', 'scClientVersion', 'setupPackage'].each { key ->
         if (!(settings[key] instanceof CharSequence) || !settings[key].toString().trim()) {
             error("${key} must be a non-empty string")
         }
@@ -208,13 +215,18 @@ def resolveSettings(Map overrides) {
             error("${key} contains unsupported quote, backslash, or control characters")
         }
     }
+    if (settings.parentBranch =~ /["\\:\r\n\u0000]/) {
+        error('parentBranch contains unsupported quote, backslash, colon, or control characters')
+    }
     if (settings.appName.contains(':') || settings.versionName.contains(':')) {
         error('appName and versionName must not contain the SSC delimiter :')
     }
     if (!(settings.bootstrap in ['npx', 'preinstalled'])) {
         error('bootstrap must be npx or preinstalled')
     }
-    ['dastScan', 'waitForDast', 'debrickedScan', 'aviatorAudit', 'aviatorRemediations', 'checkPolicy', 'exportSarif'].each { key ->
+    ['doSetup', 'doSastScan', 'doWait', 'doSastWait', 'doAppVersionSummary', 'doSastExport',
+     'doDebrickedExport', 'doPrComment', 'dastScan', 'waitForDast', 'debrickedScan', 'aviatorAudit',
+     'aviatorRemediations', 'checkPolicy', 'exportSarif'].each { key ->
         if (!(settings[key] instanceof Boolean)) {
             error("${key} must be a Boolean")
         }
