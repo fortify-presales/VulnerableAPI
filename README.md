@@ -42,6 +42,17 @@ mvn -B clean verify
 mvn spring-boot:run
 ```
 
+## Postman testing
+
+Import [the Postman collection](postman/vulnapp.postman_collection.json) for 15
+requests covering every controller endpoint, with response assertions and demo
+logins included. It defaults to `http://localhost:8080`; no separate environment
+is required. Login does not establish an authenticated session, so the account
+request expects **401**, even after login.
+
+See [the Postman testing guide](docs/postman-testing.md) for setup, credentials,
+collection variables, expected responses, and server-specific prerequisites.
+
 ## Jenkins pipeline
 
 The [Jenkinsfile](Jenkinsfile) builds the app with Maven, bootstraps fcli using
