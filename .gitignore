@@ -18,3 +18,5 @@ buildNumber.properties
 
 .fortify
 test.ps1
+scan.fpr
+.fortify/fcli-all-commands.json

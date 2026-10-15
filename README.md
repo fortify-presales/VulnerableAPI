@@ -17,8 +17,23 @@ Java project with Jenkins build and ScanCentral integration via fcli
 | SSRF | `web/FetchController.java` (`GET /fetch?url=`) |
 | Open Redirect | `web/RedirectController.java` (`GET /redirect?target=`) |
 | Log Forging | `web/AuthController.java` (`POST /login`) |
+| IDOR / missing object-level authorization (candidate Agentic Analyzer target) | `web/AccountController.java` (`GET /accounts/{username}`) |
+| Negative-value transfer (business-logic flaw; candidate Agentic Analyzer target) | `web/TransferController.java` (`POST /transfer`) |
 | Weak Hash (MD5), Weak Cipher (DES/ECB), Insecure Randomness, Hard-coded Password/Key | `util/CryptoUtil.java` |
 | Hard-coded datasource password | `src/main/resources/application.properties` |
+
+The transfer endpoint intentionally omits positive-amount validation: a negative amount
+reverses the balance updates and credits the sender. This is intended as a business-logic
+test case for Fortify Agentic Analyzer, not a guarantee that conventional SAST will miss
+it or that Agentic Analyzer will report it; compare results from both scan modes to verify
+that behavior for your configuration.
+
+The account endpoint requires a servlet `Principal` but does not verify that the requested
+username belongs to that principal. With an authentication layer supplying the principal,
+an authenticated user can change the username in the URL to read another user's email and
+balance. The sample does not configure authentication itself; the test supplies a principal
+to demonstrate the missing object-level authorization. This is an intentional IDOR test case,
+not a guarantee that either Fortify analyzer will report it.
 
 ## Build locally
 
