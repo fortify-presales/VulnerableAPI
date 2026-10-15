@@ -17,6 +17,13 @@ buildNumber.properties
 .classpath
 
 .fortify
+fcli-all-commands.json
 test.ps1
 scan.fpr
 .fortify/fcli-all-commands.json
+aviator-demos.txt
+fortifypackage.zip
+VulnerableApp-Jenkins-main.zip
+.gitignore
+.fortify/fcli-all-commands.json
+.gitignore
