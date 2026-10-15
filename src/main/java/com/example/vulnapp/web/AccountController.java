@@ -28,7 +28,7 @@ public class AccountController {
         }
 
         List<Map<String, Object>> accounts = jdbcTemplate.queryForList(
-                "SELECT u.username, u.email, a.balance "
+                "SELECT u.username AS \"username\", u.email AS \"email\", a.balance AS \"balance\" "
                         + "FROM users u JOIN accounts a ON a.username = u.username "
                         + "WHERE u.username = ?",
                 username);
