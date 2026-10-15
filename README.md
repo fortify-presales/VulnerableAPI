@@ -1,4 +1,4 @@
-# jenkins-fcli-scancentral
+# VulnerableApp-Jenkins
 Java project with Jenkins build and ScanCentral integration via fcli
 
 > **Warning:** This application is intentionally insecure and exists only to exercise

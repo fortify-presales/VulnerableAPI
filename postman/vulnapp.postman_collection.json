@@ -211,18 +211,6 @@
           }
         },
         {
-          "name": "Ping loopback (Linux server required)",
-          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-            "pm.test('Ping handler succeeds', () => pm.response.to.have.status(200));",
-            "pm.test('Ping produced output', () => pm.expect(pm.response.text().trim()).not.to.eql(''));"
-          ] } }],
-          "request": {
-            "method": "GET", "header": [],
-            "url": { "raw": "{{baseUrl}}/ping?host={{pingHost}}", "host": ["{{baseUrl}}"], "path": ["ping"], "query": [{ "key": "host", "value": "{{pingHost}}" }] },
-            "description": "Requires sh, ping -c, and permission to ping on the application server. A native Windows server typically returns 500 because sh is absent. Containers may lack ping or ICMP permission. This check intentionally reports those failures."
-          }
-        },
-        {
           "name": "Download fixture (opt-in)",
           "event": [
             { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [

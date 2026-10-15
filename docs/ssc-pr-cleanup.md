@@ -6,7 +6,12 @@ must not execute Jenkinsfile code from the PR being closed.
 
 The example Jenkinsfile is [Jenkinsfile.ssc-pr-cleanup](../examples/jenkins/Jenkinsfile.ssc-pr-cleanup). It listens for GitHub
 `pull_request` events with action `closed`, then maps the PR number to an SSC version such as
-`jenkins-fcli-scancentral:PR-42`.
+`VulnerbleApp-Jenkins:PR-42`.
+
+The GitHub repository is `fortify-presales/VulnerableApp-Jenkins`; the existing SSC
+application name remains `jenkins-fcli-scancentral`. Keep `SSC_APP_NAME` aligned
+with the scan jobs rather than renaming it to match GitHub. After deploying the
+updated cleanup Jenkinsfile, run the job once to apply the renamed-repository filter.
 
 ## Important: Match the Existing Version Name
 
@@ -33,7 +38,7 @@ the example so cleanup targets exactly the version created by the scan job.
    Keep the Jenkins trigger token out of source control and do not expose an unauthenticated trigger endpoint.
 5. Run the job once so Jenkins applies the Pipeline trigger configuration. The trigger extracts `action`, PR
    `number`, base repository full name, and `pull_request.merged`; its regexp filter targets closed PRs for
-   `fortify-presales/jenkins-fcli-scancentral`. The Jenkinsfile also ignores non-closed payloads that reach the
+   `fortify-presales/VulnerableApp-Jenkins`. The Jenkinsfile also ignores non-closed payloads that reach the
    job and validates the repository and PR number before contacting SSC.
 
 The Generic Webhook Trigger token can cause the job to run with Jenkins `SYSTEM` authority. Treat the endpoint
