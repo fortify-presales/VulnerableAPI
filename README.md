@@ -57,14 +57,17 @@ and plugins to Nexus and disables Central while active. See
 
 ## Postman testing
 
-Import [the Postman collection](postman/vulnapp.postman_collection.json) for 15
-requests covering every controller endpoint, with response assertions and demo
-logins included. It defaults to `http://localhost:8080`; no separate environment
-is required. Login does not establish an authenticated session, so the account
-request expects **401**, even after login.
+Import [the literal Postman collection](postman/vulnapp.postman_collection.json)
+for 14 requests with response assertions and demo logins, covering every controller
+endpoint except `/ping`. All values are literal and default to `http://localhost:8080`;
+no environment is required. Alternatively, use
+[the environment collection](postman/vulnapp-environment.postman_collection.json)
+with [the local environment file](postman/vulnapp-local.postman_environment.json).
+Login does not establish an authenticated session, so the account request expects
+**401**, even after login.
 
 See [the Postman testing guide](docs/postman-testing.md) for setup, credentials,
-collection variables, expected responses, and server-specific prerequisites.
+environment variables, Newman commands, expected responses, and DAST considerations.
 
 ## Jenkins pipeline
 

@@ -1,27 +1,10 @@
 {
   "info": {
-    "name": "Vulnapp - Local API Tests",
-    "description": "For this intentionally vulnerable application in an isolated local environment only. Import and run with the Postman desktop app or Desktop Agent. Defaults target http://localhost:8080. Demo credentials are included. Login returns a random string, not a usable authenticated session: there is no token validator, session cookie, or Spring Security configuration. Requests intentionally use No Auth; the account request expects 401 even after login. Run against a fresh app for seeded data. Transfers mutate in-memory balances; restart the application to reset them. Ping requires sh and ping on the server. The file request requires a fixture and is skipped in collection runs until fileReady=true. Deserialization uses an intentionally invalid stream to verify the endpoint is reachable without including an unsafe serialized object.",
+    "name": "Vulnapp - Literal API Tests",
+    "description": "For this intentionally vulnerable application in an isolated local environment only. All request values are literal; no Postman variables or environment are used. Defaults target http://localhost:8080: replace the request URLs with an address reachable from your client or DAST sensor before remote use. Demo credentials are included. Login returns a random string, not an authenticated session. Requests use No Auth; account access expects 401. Transfers mutate in-memory balances. File download is skipped by a pre-request script: create the server-side fixture and remove that script to enable it. A DAST importer may not honor Postman scripts, including this skip. Deserialization is an invalid-stream negative test, not successful deserialization. No ScanCentral DAST compatibility is implied.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": { "type": "noauth" },
-  "variable": [
-    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
-    { "key": "username", "value": "alice", "type": "string" },
-    { "key": "password", "value": "password", "type": "string" },
-    { "key": "adminUsername", "value": "admin", "type": "string" },
-    { "key": "adminPassword", "value": "P@ssw0rd!", "type": "string" },
-    { "key": "loginToken", "value": "", "type": "string" },
-    { "key": "accountUsername", "value": "alice", "type": "string" },
-    { "key": "transferFrom", "value": "alice", "type": "string" },
-    { "key": "transferTo", "value": "bob", "type": "string" },
-    { "key": "transferAmount", "value": "1.00", "type": "string" },
-    { "key": "pingHost", "value": "127.0.0.1", "type": "string" },
-    { "key": "fileName", "value": "sample.txt", "type": "string" },
-    { "key": "fileReady", "value": "false", "type": "string" },
-    { "key": "fetchUrl", "value": "http://127.0.0.1:8080/greet?name=Postman", "type": "string" },
-    { "key": "redirectTarget", "value": "/greet?name=Postman", "type": "string" }
-  ],
   "item": [
     {
       "name": "Authentication",
@@ -29,22 +12,20 @@
         {
           "name": "Login - seeded user",
           "event": [
-            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": ["pm.collectionVariables.unset('loginToken');"] } },
             { "listen": "test", "script": { "type": "text/javascript", "exec": [
               "pm.test('Login succeeds', () => pm.response.to.have.status(200));",
-              "pm.test('Returns a hexadecimal demo token', () => pm.expect(pm.response.text()).to.match(/^[0-9a-f]{1,16}$/));",
-              "if (pm.response.code === 200) pm.collectionVariables.set('loginToken', pm.response.text());"
+              "pm.test('Returns a hexadecimal demo token', () => pm.expect(pm.response.text()).to.match(/^[0-9a-f]{1,16}$/));"
             ] } }
           ],
           "request": {
             "method": "POST",
             "header": [],
             "body": { "mode": "urlencoded", "urlencoded": [
-              { "key": "username", "value": "{{username}}", "type": "text" },
-              { "key": "password", "value": "{{password}}", "type": "text" }
+              { "key": "username", "value": "alice", "type": "text" },
+              { "key": "password", "value": "password", "type": "text" }
             ] },
-            "url": "{{baseUrl}}/login",
-            "description": "Default alice/password matches the seeded user. Stores the response in loginToken for inspection only. The app does not accept it as Bearer authentication or create a servlet Principal. Other seeded credentials: bob/abc123 and carol/12345678."
+            "url": "http://localhost:8080/login",
+            "description": "Demo credentials alice/password match the seeded user. The response token is not stored or used. The app does not accept it as Bearer authentication or create a servlet Principal. Other seeded credentials: bob/abc123 and carol/12345678."
           }
         },
         {
@@ -56,10 +37,10 @@
           "request": {
             "method": "POST", "header": [],
             "body": { "mode": "urlencoded", "urlencoded": [
-              { "key": "username", "value": "{{adminUsername}}", "type": "text" },
-              { "key": "password", "value": "{{adminPassword}}", "type": "text" }
+              { "key": "username", "value": "admin", "type": "text" },
+              { "key": "password", "value": "P@ssw0rd!", "type": "text" }
             ] },
-            "url": "{{baseUrl}}/login",
+            "url": "http://localhost:8080/login",
             "description": "Uses the application's hard-coded demo admin credentials, not the datasource password."
           }
         },
@@ -72,10 +53,10 @@
           "request": {
             "method": "POST", "header": [],
             "body": { "mode": "urlencoded", "urlencoded": [
-              { "key": "username", "value": "{{username}}", "type": "text" },
+              { "key": "username", "value": "alice", "type": "text" },
               { "key": "password", "value": "intentionally-wrong-password", "type": "text" }
             ] },
-            "url": "{{baseUrl}}/login"
+            "url": "http://localhost:8080/login"
           }
         }
       ]
@@ -91,12 +72,12 @@
             "  const users = pm.response.json();",
             "  pm.expect(users).to.be.an('array').that.is.not.empty;",
             "  const usernames = users.map(user => user.USERNAME || user.username);",
-            "  pm.expect(usernames).to.include(pm.variables.get('username'));",
+            "  pm.expect(usernames).to.include('alice');",
             "});"
           ] } }],
           "request": {
             "method": "GET", "header": [],
-            "url": { "raw": "{{baseUrl}}/users?name={{username}}", "host": ["{{baseUrl}}"], "path": ["users"], "query": [{ "key": "name", "value": "{{username}}" }] }
+            "url": { "raw": "http://localhost:8080/users?name=alice", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["users"], "query": [{ "key": "name", "value": "alice" }] }
           }
         },
         {
@@ -105,7 +86,7 @@
             "pm.test('Standalone app has no authenticated principal', () => pm.response.to.have.status(401));"
           ] } }],
           "request": {
-            "method": "GET", "header": [], "url": "{{baseUrl}}/accounts/{{accountUsername}}",
+            "method": "GET", "header": [], "url": "http://localhost:8080/accounts/alice",
             "description": "Expected 401 in the standalone application, including after a successful login. Access requires an external authentication layer that supplies a servlet Principal; adding arbitrary Bearer or Basic headers does not do that. If such a layer is installed, configure its actual authentication and update this assertion to suit that deployment."
           }
         }
@@ -123,11 +104,11 @@
           "request": {
             "method": "POST", "header": [],
             "body": { "mode": "urlencoded", "urlencoded": [
-              { "key": "from", "value": "{{transferFrom}}", "type": "text" },
-              { "key": "to", "value": "{{transferTo}}", "type": "text" },
-              { "key": "amount", "value": "{{transferAmount}}", "type": "text" }
+              { "key": "from", "value": "alice", "type": "text" },
+              { "key": "to", "value": "bob", "type": "text" },
+              { "key": "amount", "value": "1.00", "type": "text" }
             ] },
-            "url": "{{baseUrl}}/transfer",
+            "url": "http://localhost:8080/transfer",
             "description": "No authentication is enforced. Defaults transfer 1.00 from alice (initially 1000.00) to bob (initially 500.00). Repeated runs consume the sender balance; restart the app to reset the in-memory database."
           }
         },
@@ -140,11 +121,11 @@
           "request": {
             "method": "POST", "header": [],
             "body": { "mode": "urlencoded", "urlencoded": [
-              { "key": "from", "value": "{{transferFrom}}", "type": "text" },
+              { "key": "from", "value": "alice", "type": "text" },
               { "key": "to", "value": "nonexistent-postman-user", "type": "text" },
               { "key": "amount", "value": "1.00", "type": "text" }
             ] },
-            "url": "{{baseUrl}}/transfer"
+            "url": "http://localhost:8080/transfer"
           }
         }
       ]
@@ -158,7 +139,7 @@
             "pm.test('Greeting succeeds', () => pm.response.to.have.status(200));",
             "pm.test('Contains supplied name', () => pm.expect(pm.response.text()).to.include('Hello Postman'));"
           ] } }],
-          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/greet?name=Postman", "host": ["{{baseUrl}}"], "path": ["greet"], "query": [{ "key": "name", "value": "Postman" }] } }
+          "request": { "method": "GET", "header": [], "url": { "raw": "http://localhost:8080/greet?name=Postman", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["greet"], "query": [{ "key": "name", "value": "Postman" }] } }
         },
         {
           "name": "Encrypt demo text",
@@ -170,7 +151,7 @@
           "request": {
             "method": "POST", "header": [],
             "body": { "mode": "urlencoded", "urlencoded": [{ "key": "value", "value": "hello-postman", "type": "text" }] },
-            "url": "{{baseUrl}}/encrypt"
+            "url": "http://localhost:8080/encrypt"
           }
         },
         {
@@ -182,7 +163,7 @@
           "request": {
             "method": "POST", "header": [{ "key": "Content-Type", "value": "application/xml" }],
             "body": { "mode": "raw", "raw": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<message>Hello Postman</message>", "options": { "raw": { "language": "xml" } } },
-            "url": "{{baseUrl}}/xml"
+            "url": "http://localhost:8080/xml"
           }
         },
         {
@@ -193,8 +174,8 @@
           ] } }],
           "request": {
             "method": "GET", "header": [],
-            "url": { "raw": "{{baseUrl}}/fetch?url={{fetchUrl}}", "host": ["{{baseUrl}}"], "path": ["fetch"], "query": [{ "key": "url", "value": "{{fetchUrl}}" }] },
-            "description": "fetchUrl is resolved from the application server, not Postman. Its default calls this application's local greeting on port 8080. Adjust it separately if the server listens on another port; keep the name=Postman query for the assertion."
+            "url": { "raw": "http://localhost:8080/fetch?url=http%3A%2F%2F127.0.0.1%3A8080%2Fgreet%3Fname%3DPostman", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["fetch"], "query": [{ "key": "url", "value": "http://127.0.0.1:8080/greet?name=Postman" }] },
+            "description": "The url query parameter is resolved from the application server, not Postman. It calls this application's local greeting on port 8080. Adjust it separately if the server listens on another port; keep name=Postman for the assertion."
           }
         },
         {
@@ -202,11 +183,11 @@
           "protocolProfileBehavior": { "followRedirects": false },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('Returns redirect without following it', () => pm.response.to.have.status(302));",
-            "pm.test('Location contains configured target', () => pm.expect(pm.response.headers.get('Location')).to.include(pm.variables.get('redirectTarget')));"
+            "pm.test('Location contains literal target', () => pm.expect(pm.response.headers.get('Location')).to.include('/greet?name=Postman'));"
           ] } }],
           "request": {
             "method": "GET", "header": [],
-            "url": { "raw": "{{baseUrl}}/redirect?target={{redirectTarget}}", "host": ["{{baseUrl}}"], "path": ["redirect"], "query": [{ "key": "target", "value": "{{redirectTarget}}" }] },
+            "url": { "raw": "http://localhost:8080/redirect?target=%2Fgreet%3Fname%3DPostman", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["redirect"], "query": [{ "key": "target", "value": "/greet?name=Postman" }] },
             "description": "Redirect following is disabled for this request so the 302 and Location header can be checked."
           }
         },
@@ -214,17 +195,15 @@
           "name": "Download fixture (opt-in)",
           "event": [
             { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
-              "if (pm.variables.get('fileReady') !== 'true') {",
-              "  console.warn('Skipped: create sample.txt in the server app.files.base-dir, then set fileReady=true.');",
-              "  pm.execution.skipRequest();",
-              "}"
+              "console.warn('Skipped: create sample.txt in the server app.files.base-dir, then remove this pre-request script to enable the request.');",
+              "pm.execution.skipRequest();"
             ] } },
             { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('File downloaded', () => pm.response.to.have.status(200));"] } }
           ],
           "request": {
             "method": "GET", "header": [],
-            "url": { "raw": "{{baseUrl}}/files?name={{fileName}}", "host": ["{{baseUrl}}"], "path": ["files"], "query": [{ "key": "name", "value": "{{fileName}}" }] },
-            "description": "Create sample.txt in the SERVER's app.files.base-dir (default /tmp/vulnapp-files), then set fileReady to the string true. A missing file produces 500 in this application. Nothing is uploaded by this collection."
+            "url": { "raw": "http://localhost:8080/files?name=sample.txt", "protocol": "http", "host": ["localhost"], "port": "8080", "path": ["files"], "query": [{ "key": "name", "value": "sample.txt" }] },
+            "description": "Create sample.txt in the SERVER's app.files.base-dir (default /tmp/vulnapp-files), then remove this request's pre-request script to enable it. A missing file produces 500. A DAST importer may ignore the skip script. Nothing is uploaded by this collection."
           }
         },
         {
@@ -235,7 +214,7 @@
           "request": {
             "method": "POST", "header": [{ "key": "Content-Type", "value": "application/octet-stream" }],
             "body": { "mode": "raw", "raw": "not-a-java-serialization-stream" },
-            "url": "{{baseUrl}}/deserialize",
+            "url": "http://localhost:8080/deserialize",
             "description": "Negative test only: the current controller lets StreamCorruptedException become HTTP 500. This assertion documents current behavior, not desirable error handling. For a success test, change Body to binary and select a trusted Java ObjectOutputStream file containing a simple String; expected result is 200 with 'Deserialized: java.lang.String'. JSON and Base64 text are not Java serialization streams. Do not submit untrusted serialized objects."
           }
         }

@@ -1,0 +1,220 @@
+{
+  "info": {
+    "name": "Vulnapp - Environment API Tests",
+    "description": "Import and select vulnapp-local.postman_environment.json before running. Request placeholders resolve from the selected Postman environment; there are no collection variables. For an isolated local instance of this intentionally vulnerable app only. Login captures loginToken in the environment for inspection, not authorization: the app does not validate tokens or establish a Principal. Account access expects 401. Transfers mutate balances. File download is skipped unless the environment fileReady value is true. DAST importers may not execute scripts or support environment files; use the literal collection where variable substitution is unavailable. Do not expose this intentionally vulnerable application publicly.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": { "type": "noauth" },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Login - seeded user",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": ["pm.environment.unset('loginToken');"] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('Login succeeds', () => pm.response.to.have.status(200));",
+              "pm.test('Returns a hexadecimal demo token', () => pm.expect(pm.response.text()).to.match(/^[0-9a-f]{1,16}$/));",
+              "if (pm.response.code === 200) pm.environment.set('loginToken', pm.response.text());"
+            ] } }
+          ],
+          "request": {
+            "method": "POST", "header": [],
+            "url": "{{baseUrl}}/login",
+            "body": { "mode": "urlencoded", "urlencoded": [
+              { "key": "username", "value": "{{username}}", "type": "text" },
+              { "key": "password", "value": "{{password}}", "type": "text" }
+            ] },
+            "description": "Defaults to alice/password from the environment. Stores the demo token in environment loginToken for inspection only; this token cannot authenticate later requests."
+          }
+        },
+        {
+          "name": "Login - demo admin",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Admin login succeeds', () => pm.response.to.have.status(200));",
+            "pm.test('Returns a hexadecimal demo token', () => pm.expect(pm.response.text()).to.match(/^[0-9a-f]{1,16}$/));"
+          ] } }],
+          "request": {
+            "method": "POST", "header": [], "url": "{{baseUrl}}/login",
+            "body": { "mode": "urlencoded", "urlencoded": [
+              { "key": "username", "value": "{{adminUsername}}", "type": "text" },
+              { "key": "password", "value": "{{adminPassword}}", "type": "text" }
+            ] },
+            "description": "Uses the demo admin credentials from the environment, not the datasource password."
+          }
+        },
+        {
+          "name": "Login - rejected credentials",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Invalid credentials are rejected', () => pm.response.to.have.status(401));",
+            "pm.test('Returns rejection message', () => pm.expect(pm.response.text()).to.eql('Invalid credentials'));"
+          ] } }],
+          "request": {
+            "method": "POST", "header": [], "url": "{{baseUrl}}/login",
+            "body": { "mode": "urlencoded", "urlencoded": [
+              { "key": "username", "value": "{{username}}", "type": "text" },
+              { "key": "password", "value": "intentionally-wrong-password", "type": "text" }
+            ] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users and accounts",
+      "item": [
+        {
+          "name": "Find seeded user",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('User lookup succeeds', () => pm.response.to.have.status(200));",
+            "pm.test('Returns the requested user', () => {",
+            "  const users = pm.response.json();",
+            "  pm.expect(users).to.be.an('array').that.is.not.empty;",
+            "  const usernames = users.map(user => user.USERNAME || user.username);",
+            "  pm.expect(usernames).to.include(pm.environment.get('username'));",
+            "});"
+          ] } }],
+          "request": {
+            "method": "GET", "header": [],
+            "url": { "raw": "{{baseUrl}}/users?name={{username}}", "host": ["{{baseUrl}}"], "path": ["users"], "query": [{ "key": "name", "value": "{{username}}" }] }
+          }
+        },
+        {
+          "name": "Account - no authenticated principal",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Standalone app has no authenticated principal', () => pm.response.to.have.status(401));"
+          ] } }],
+          "request": {
+            "method": "GET", "header": [], "url": "{{baseUrl}}/accounts/{{accountUsername}}",
+            "description": "Expected 401, including after login. Successful access requires an external authentication layer that supplies a servlet Principal; arbitrary Basic or Bearer headers do not do that."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transfers (mutates balances)",
+      "item": [
+        {
+          "name": "Transfer between seeded accounts",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Transfer succeeds', () => pm.response.to.have.status(200));",
+            "pm.test('Transfer confirmed', () => pm.expect(pm.response.text()).to.eql('Transfer complete'));"
+          ] } }],
+          "request": {
+            "method": "POST", "header": [], "url": "{{baseUrl}}/transfer",
+            "body": { "mode": "urlencoded", "urlencoded": [
+              { "key": "from", "value": "{{transferFrom}}", "type": "text" },
+              { "key": "to", "value": "{{transferTo}}", "type": "text" },
+              { "key": "amount", "value": "{{transferAmount}}", "type": "text" }
+            ] },
+            "description": "No authentication is enforced. Repeated runs consume the sender balance; restart the app to restore seeded accounts."
+          }
+        },
+        {
+          "name": "Transfer - unknown recipient",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Unknown recipient rejected', () => pm.response.to.have.status(400));",
+            "pm.test('Explains rejection', () => pm.expect(pm.response.text()).to.eql('Unknown recipient'));"
+          ] } }],
+          "request": {
+            "method": "POST", "header": [], "url": "{{baseUrl}}/transfer",
+            "body": { "mode": "urlencoded", "urlencoded": [
+              { "key": "from", "value": "{{transferFrom}}", "type": "text" },
+              { "key": "to", "value": "nonexistent-postman-user", "type": "text" },
+              { "key": "amount", "value": "1.00", "type": "text" }
+            ] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Utilities",
+      "item": [
+        {
+          "name": "Greeting",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Greeting succeeds', () => pm.response.to.have.status(200));",
+            "pm.test('Contains supplied name', () => pm.expect(pm.response.text()).to.include('Hello Postman'));"
+          ] } }],
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/greet?name=Postman", "host": ["{{baseUrl}}"], "path": ["greet"], "query": [{ "key": "name", "value": "Postman" }] } }
+        },
+        {
+          "name": "Encrypt demo text",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Encryption succeeds', () => pm.response.to.have.status(200));",
+            "pm.test('Returns nonempty Base64 ciphertext', () => pm.expect(pm.response.text()).to.match(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/));",
+            "pm.test('Ciphertext is not empty', () => pm.expect(pm.response.text()).not.to.eql(''));"
+          ] } }],
+          "request": {
+            "method": "POST", "header": [], "url": "{{baseUrl}}/encrypt",
+            "body": { "mode": "urlencoded", "urlencoded": [{ "key": "value", "value": "hello-postman", "type": "text" }] }
+          }
+        },
+        {
+          "name": "Parse benign XML",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('XML parsing succeeds', () => pm.response.to.have.status(200));",
+            "pm.test('Returns element text', () => pm.expect(pm.response.text()).to.eql('Hello Postman'));"
+          ] } }],
+          "request": {
+            "method": "POST", "header": [{ "key": "Content-Type", "value": "application/xml" }], "url": "{{baseUrl}}/xml",
+            "body": { "mode": "raw", "raw": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<message>Hello Postman</message>", "options": { "raw": { "language": "xml" } } }
+          }
+        },
+        {
+          "name": "Fetch local greeting from server",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Fetch succeeds', () => pm.response.to.have.status(200));",
+            "pm.test('Fetched greeting content', () => pm.expect(pm.response.text()).to.include('Hello Postman'));"
+          ] } }],
+          "request": {
+            "method": "GET", "header": [],
+            "url": { "raw": "{{baseUrl}}/fetch?url={{fetchUrl}}", "host": ["{{baseUrl}}"], "path": ["fetch"], "query": [{ "key": "url", "value": "{{fetchUrl}}" }] },
+            "description": "Environment fetchUrl is resolved from the application server. Update it separately from baseUrl if the server listens on another port; retain name=Postman for the assertion."
+          }
+        },
+        {
+          "name": "Redirect to local greeting",
+          "protocolProfileBehavior": { "followRedirects": false },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Returns redirect without following it', () => pm.response.to.have.status(302));",
+            "pm.test('Location contains configured target', () => pm.expect(pm.response.headers.get('Location')).to.include(pm.environment.get('redirectTarget')));"
+          ] } }],
+          "request": {
+            "method": "GET", "header": [],
+            "url": { "raw": "{{baseUrl}}/redirect?target={{redirectTarget}}", "host": ["{{baseUrl}}"], "path": ["redirect"], "query": [{ "key": "target", "value": "{{redirectTarget}}" }] },
+            "description": "Redirect following is disabled so the 302 and Location header can be checked."
+          }
+        },
+        {
+          "name": "Download fixture (opt-in)",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "if (String(pm.environment.get('fileReady')) !== 'true') {",
+              "  console.warn('Skipped: create the server-side fixture, then set environment fileReady=true.');",
+              "  pm.execution.skipRequest();",
+              "}"
+            ] } },
+            { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('File downloaded', () => pm.response.to.have.status(200));"] } }
+          ],
+          "request": {
+            "method": "GET", "header": [],
+            "url": { "raw": "{{baseUrl}}/files?name={{fileName}}", "host": ["{{baseUrl}}"], "path": ["files"], "query": [{ "key": "name", "value": "{{fileName}}" }] },
+            "description": "Create fileName in the server's app.files.base-dir (default /tmp/vulnapp-files), then set environment fileReady=true. No file is uploaded by this collection."
+          }
+        },
+        {
+          "name": "Deserialize - invalid stream (expected 500)",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('Current app returns 500 for an invalid serialization stream', () => pm.response.to.have.status(500));"
+          ] } }],
+          "request": {
+            "method": "POST", "header": [{ "key": "Content-Type", "value": "application/octet-stream" }], "url": "{{baseUrl}}/deserialize",
+            "body": { "mode": "raw", "raw": "not-a-java-serialization-stream" },
+            "description": "Negative test documenting current 500 behavior. For success, select a trusted Java ObjectOutputStream binary file containing a String and change the assertion to 200 with 'Deserialized: java.lang.String'. Never submit untrusted serialized objects."
+          }
+        }
+      ]
+    }
+  ]
+}

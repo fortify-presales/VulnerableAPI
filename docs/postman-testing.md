@@ -1,8 +1,14 @@
 # Testing with Postman
 
-The [Vulnapp collection](../postman/vulnapp.postman_collection.json) contains 15
-requests covering all 12 controller endpoints, with response assertions and demo
-credentials. No separate Postman environment is required.
+Two collections provide the same 14 requests, with response assertions and demo
+credentials. They cover all controller endpoints except `/ping`, which is omitted
+from the current collections.
+
+| File | Usage |
+|---|---|
+| [Literal collection](../postman/vulnapp.postman_collection.json) | No Postman variables or environment required; edit literal request values directly |
+| [Environment collection](../postman/vulnapp-environment.postman_collection.json) | Uses placeholders supplied by the selected Postman environment; no collection variables |
+| [Local environment](../postman/vulnapp-local.postman_environment.json) | Import and select with the environment collection; contains local URLs and demo credentials |
 
 > This application is intentionally insecure. Use an isolated local test instance;
 > never deploy it or expose it on a network.
@@ -20,8 +26,10 @@ credentials. No separate Postman environment is required.
    so requests can reach localhost.
 3. Choose **Import** and select
    [vulnapp.postman_collection.json](../postman/vulnapp.postman_collection.json).
-4. Open the collection's **Variables** tab. Set `baseUrl` to the application URL;
-   the default is `http://localhost:8080`, without a trailing slash.
+4. For the literal collection, edit request URLs and inputs directly if needed.
+   Alternatively, import the environment collection and local environment above,
+   select **Vulnapp - Local** in the environment selector, and edit its `baseUrl`
+   value. Both versions default to `http://localhost:8080`, without a trailing slash.
 5. Send individual requests, or run the collection in its listed order with the
    Collection Runner. Review the response assertions in the test results.
 
@@ -45,23 +53,30 @@ npm install --global newman@6
 newman run postman/vulnapp.postman_collection.json --timeout-request 10000
 ```
 
-Override collection defaults with `--env-var`. For example, if the application
+To run the environment collection, supply its separate environment file:
+
+```bash
+npx --yes newman@6 run postman/vulnapp-environment.postman_collection.json -e postman/vulnapp-local.postman_environment.json --timeout-request 10000
+```
+
+Override environment defaults with `--env-var`. For example, if the application
 listens on port 8081, update both the client-facing URL and server-side fetch URL:
 
 ```bash
-npx --yes newman@6 run postman/vulnapp.postman_collection.json --env-var "baseUrl=http://localhost:8081" --env-var "fetchUrl=http://127.0.0.1:8081/greet?name=Postman" --timeout-request 10000
+npx --yes newman@6 run postman/vulnapp-environment.postman_collection.json -e postman/vulnapp-local.postman_environment.json --env-var "baseUrl=http://localhost:8081" --env-var "fetchUrl=http://127.0.0.1:8081/greet?name=Postman" --timeout-request 10000
 ```
 
-For a targeted run that avoids the Utilities folder's server-specific prerequisites
-(including `sh` and `ping` on native Windows), select folders explicitly:
+`--env-var` does not change literal values in the original collection. For a targeted
+run that avoids the Utilities folder's server-specific prerequisites, select folders:
 
 ```bash
 npx --yes newman@6 run postman/vulnapp.postman_collection.json --folder "Authentication" --folder "Users and accounts" --folder "Transfers (mutates balances)" --timeout-request 10000
 ```
 
-This targeted command does not cover the utility endpoints. A full run still needs
-the ping prerequisites described below. File download is skipped by default; after
-creating the server-side fixture, add `--env-var "fileReady=true"` to enable it.
+This targeted command does not cover the utility endpoints. File download is skipped
+by default. After creating the fixture, remove the file request's pre-request script
+in the literal collection, or add `--env-var "fileReady=true"` when running the
+environment collection with its environment file.
 Expected `401`, `400`, and `500` responses pass when their assertions match; an HTTP
 error status alone is not a failed test. Transfers still mutate balances on each run.
 
@@ -95,8 +110,9 @@ Other seeded credentials are `bob` / `abc123` and `carol` / `12345678`.
 These are intentionally insecure sample credentials, not deployment secrets.
 The datasource password is unrelated to API login.
 
-`POST /login` returns a random hexadecimal string. The seeded-user login request
-stores it in the collection variable `loginToken` for inspection, but the application
+`POST /login` returns a random hexadecimal string. In the environment collection,
+the seeded-user login stores it in environment variable `loginToken` for inspection;
+the literal collection does not store it. The application
 does not validate that token, issue an authenticated session cookie, or configure
 Spring Security. Requests therefore use **No Auth**; there is no Bearer-token setup
 step to perform. An invalid-login request verifies the `401` response.
@@ -107,7 +123,14 @@ Adding Basic or Bearer headers alone will not enable account access. If testing 
 deployment with an external authentication layer that supplies a principal, configure
 that layer's actual authentication on the account request and update its assertion.
 
-## Collection variables
+## Environment variables
+
+These values belong to the separate local environment, not either collection.
+Postman placeholders resolve from the active environment; remove any same-named
+local/data overrides if you want the supplied environment values to be used.
+Password/token fields are marked secret for display, but the exported JSON is not
+encrypted. It contains only intentionally public demo credentials; do not commit real
+credentials or an exported environment containing a real token.
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -118,7 +141,6 @@ that layer's actual authentication on the account request and update its asserti
 | `accountUsername` | `alice` | Account path parameter |
 | `transferFrom`, `transferTo` | `alice`, `bob` | Transfer accounts |
 | `transferAmount` | `1.00` | Amount transferred on each run |
-| `pingHost` | `127.0.0.1` | Host pinged by the application server |
 | `fileName` | `sample.txt` | File under the server's configured file directory |
 | `fileReady` | `false` | Set to `true` after creating the server-side file fixture |
 | `fetchUrl` | `http://127.0.0.1:8080/greet?name=Postman` | URL fetched by the application server |
@@ -144,7 +166,6 @@ targets; update those assertions if changing the sample content.
 | XML parsing | `200` with `Hello Postman` |
 | Fetch local greeting | `200` containing `Hello Postman` |
 | Redirect | `302` with the configured target in `Location`; following redirects is disabled on this request |
-| Ping | `200` with command output, when server prerequisites are met |
 | File download | Skipped by default; `200` after fixture setup |
 | Invalid deserialization stream | `500`, documenting current error handling |
 
@@ -155,18 +176,13 @@ Transfers change the in-memory database. Initial balances are `alice: 1000.00`,
 restart the application to restore seeded data. The default requests use positive
 amounts and do not attempt to exploit the intentional negative-amount flaw.
 
-### Ping
-
-The server executes `sh -c "ping -c 1 ..."`. It needs `sh`, a compatible `ping`
-command, and permission to send ICMP traffic. Native Windows typically returns `500`
-because `sh` is absent; containers may lack `ping` or ICMP permissions. This is a
-server prerequisite, not a Postman authentication failure.
-
 ### File download
 
 Create `sample.txt` in the application's server-side `app.files.base-dir`, which
-defaults to `/tmp/vulnapp-files`. Set the collection variable `fileReady` to the
-string `true`, then send the file request. Change `fileName` if using another fixture.
+defaults to `/tmp/vulnapp-files`. In the environment version, set environment
+variable `fileReady` to the string `true`, then send the file request; change
+environment `fileName` if using another fixture. In the literal version, remove the
+file request's pre-request script to enable it, and edit its `name` query directly.
 The collection does not upload or create this file. A missing file produces `500`
 in the current application.
 
@@ -181,9 +197,24 @@ written by Java `ObjectOutputStream` containing a simple `String`. Update its te
 to expect `200` and the response `Deserialized: java.lang.String`. JSON and Base64
 text are not Java serialization streams. Never submit untrusted serialized objects.
 
+## ScanCentral DAST considerations
+
+The literal collection removes variable-substitution dependencies, but that alone
+does not guarantee compatibility with a particular DAST importer. `localhost` means
+the DAST sensor or container, not your development machine; replace literal request
+URLs with the address of an isolated test instance reachable from the sensor.
+For structured URLs, keep the raw URL, protocol, host, port, path, and query fields
+consistent when editing. Keep the server-side fetch destination separate from the
+client-facing address.
+
+Do not assume a DAST importer executes the Postman assertions or honors the file
+skip script. Create the fixture or exclude the file request through your scan
+configuration. Use the environment version only where the tool supports supplying
+and resolving Postman environments. Neither collection establishes authentication.
+
 ## Validation scope
 
-The collection was statically checked for JSON parsing, controller endpoint coverage,
-script syntax, variable references, and seeded credentials. Live API responses were
-not verified during collection creation. Use the Collection Runner or Newman against
-your isolated instance to verify runtime behavior and the server-specific prerequisites.
+Both collections were statically checked for JSON parsing, script syntax, matching
+request defaults, and environment resolution. ScanCentral DAST compatibility has not
+been verified. Use the Collection Runner or Newman against your isolated instance
+to verify runtime behavior and the server-specific prerequisites.
