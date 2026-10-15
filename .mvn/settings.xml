@@ -10,12 +10,37 @@
         </server>
     </servers>
 
-    <mirrors>
-        <mirror>
+    <profiles>
+        <profile>
             <id>nexus</id>
-            <name>Nexus</name>
-            <mirrorOf>*</mirrorOf>
-            <url>https://repo.onfortify.com/repository/maven-public/</url>
-        </mirror>
-    </mirrors>
+            <repositories>
+                <repository>
+                    <id>nexus</id>
+                    <url>https://repo.onfortify.com/repository/maven-public/</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </repository>
+                <repository>
+                    <id>central</id>
+                    <url>https://repo.maven.apache.org/maven2</url>
+                    <releases><enabled>false</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </repository>
+            </repositories>
+            <pluginRepositories>
+                <pluginRepository>
+                    <id>nexus</id>
+                    <url>https://repo.onfortify.com/repository/maven-public/</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </pluginRepository>
+                <pluginRepository>
+                    <id>central</id>
+                    <url>https://repo.maven.apache.org/maven2</url>
+                    <releases><enabled>false</enabled></releases>
+                    <snapshots><enabled>false</enabled></snapshots>
+                </pluginRepository>
+            </pluginRepositories>
+        </profile>
+    </profiles>
 </settings>

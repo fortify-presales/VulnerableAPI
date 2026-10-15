@@ -3,7 +3,10 @@
 [Jenkinsfile.docker](../Jenkinsfile.docker) runs the build and Fortify steps inside a container that already
 contains fcli, ScanCentral Client, a JDK and Maven. It replaces the `@fortify/setup` npm bootstrap
 (`bootstrap: 'preinstalled'` in `fortifyCi`), so no npm registry or fcli/tool-definition mirrors are needed.
-The Maven mirror in [.mvn/settings.xml](../.mvn/settings.xml) is still used.
+Maven defaults to public Central. To use the optional `nexus` profile in
+[.mvn/settings.xml](../.mvn/settings.xml), follow the
+[Maven profile instructions](nexus-mirroring.md#3-maven); using the container does
+not activate that profile automatically.
 
 ## Why a custom image
 

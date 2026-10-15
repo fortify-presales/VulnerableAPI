@@ -42,6 +42,19 @@ mvn -B clean verify
 mvn spring-boot:run
 ```
 
+Maven uses public Maven Central by default; Nexus credentials are not required.
+To use `repo.onfortify.com`, set `NEXUS_USERNAME` and `NEXUS_PASSWORD` in your
+environment and activate the optional settings profile:
+
+```bash
+mvn -Pnexus -B clean verify
+mvn -Pnexus spring-boot:run
+```
+
+The `nexus` profile in [.mvn/settings.xml](.mvn/settings.xml) routes dependencies
+and plugins to Nexus and disables Central while active. See
+[Nexus configuration](docs/nexus-mirroring.md#3-maven) for Jenkins and ScanCentral.
+
 ## Postman testing
 
 Import [the Postman collection](postman/vulnapp.postman_collection.json) for 15
@@ -280,7 +293,8 @@ The JCasC sample sets `NPM_REGISTRY` to the Nexus npm group, and the shared step
 controller-level value. Without a global value, it uses public npm. Pass `npmRegistry` to
 `fortifyCi` only when one application needs a different registry. fcli and supporting tools still
 use public sources unless the additional mirrors are configured. For a different repository
-manager, set the global registry and update the Maven mirror in [.mvn/settings.xml](.mvn/settings.xml).
+manager, set the global registry and update the Maven repositories in the optional
+`nexus` profile in [.mvn/settings.xml](.mvn/settings.xml).
 Follow [the Nexus guide](docs/nexus-mirroring.md) or
 [the Artifactory guide](docs/artifactory-mirroring.md) for repository provisioning and validation.
 
@@ -354,7 +368,7 @@ and open a PR manually. Automatic PR creation would require a separate Git-provi
 
 - Set `DAST_SETTINGS` to the numeric ScanCentral DAST scan-settings ID for each application/job. Find IDs with `fcli sc-dast scan-settings list`; the setting is required only when `ENABLE_DAST_SCAN` is selected. Use the numeric ID, not a CI/CD token.
 - `SSC_APP_NAME` and `DAST_SETTINGS` are application/job-specific parameters. Aviator availability and entitlements depend on tenant configuration. Aviator remediations are preview functionality; on Jenkins they push a branch but do not create a pull request.
-- Jenkins uses the `nexus-credentials` credential for Maven and npm dependency resolution via `https://repo.onfortify.com`. Maven is configured through [.mvn/settings.xml](.mvn/settings.xml) and [.mvn/maven.config](.mvn/maven.config). npm (`npx @fortify/setup`) uses the shared step's `npmRegistry` setting through a private temporary config file. Locally, set `NEXUS_USERNAME`/`NEXUS_PASSWORD`.
+- Jenkins binds `nexus-credentials` for private repository access, but Maven uses public Central unless `-Pnexus` is selected. The optional profile is configured through [.mvn/settings.xml](.mvn/settings.xml) and [.mvn/maven.config](.mvn/maven.config); see [Nexus configuration](docs/nexus-mirroring.md#3-maven). npm (`npx @fortify/setup`) uses the shared step's `npmRegistry` setting independently through a private temporary config file. For Nexus Maven access, set `NEXUS_USERNAME`/`NEXUS_PASSWORD` and activate the profile.
 - Pipeline parameters: `SSC_APP_NAME`, `ISSUE_TEMPLATE`, `SAST_SENSOR_POOL`, `DAST_SETTINGS`, `ENABLE_DAST_SCAN`, `WAIT_FOR_DAST`, `ENABLE_DEBRICKED_SCAN`, `ENABLE_AVIATOR_AUDIT`, `ENABLE_AVIATOR_REMEDIATIONS`, `ENABLE_CHECK_POLICY`, `EXPORT_SARIF`.
 
 The SSC application version defaults to `<SSC_APP_NAME>:<BRANCH_NAME>` (or `:main` for

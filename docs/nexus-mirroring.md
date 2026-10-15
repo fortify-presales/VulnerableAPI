@@ -8,7 +8,7 @@ internet access to Maven Central, npm, GitHub or `tools.fortify.com`.
 
 | Download | Default source | Nexus repository | Configured via |
 |---|---|---|---|
-| Maven dependencies | Maven Central | `maven-public` (group/proxy) | [.mvn/settings.xml](../.mvn/settings.xml) + [.mvn/maven.config](../.mvn/maven.config) |
+| Maven dependencies and plugins | Maven Central | `maven-public` (group/proxy) | Optional `-Pnexus` profile in [.mvn/settings.xml](../.mvn/settings.xml), loaded by [.mvn/maven.config](../.mvn/maven.config) |
 | `@fortify/setup` (npm) | registry.npmjs.org | `npm-public` (group/proxy) | Global `NPM_REGISTRY` (JCasC or Jenkins global properties) |
 | fcli binary | github.com | `github-proxy` (raw proxy) | `FCLI_BOOTSTRAP_URL` |
 | Tool definitions | github.com | `fortify-hosted` (raw hosted, rewritten copy) | `TOOL_DEFINITIONS` |
@@ -45,17 +45,41 @@ Recommendations:
 
 ## 3. Maven
 
-[.mvn/settings.xml](../.mvn/settings.xml) mirrors all repositories (`mirrorOf *`) to
-`https://repo.onfortify.com/repository/maven-public/` and reads credentials from the
-`NEXUS_USERNAME` / `NEXUS_PASSWORD` environment variables.
+Maven uses public Maven Central by default, without Nexus credentials.
+[.mvn/settings.xml](../.mvn/settings.xml) defines an optional `nexus` profile that
+uses `https://repo.onfortify.com/repository/maven-public/` for dependencies and
+plugins and disables Central for both while active. Its server entry reads
+credentials from `NEXUS_USERNAME` / `NEXUS_PASSWORD`; no secret values are committed.
 [.mvn/maven.config](../.mvn/maven.config) passes `-s .mvn/settings.xml` to every `mvn` invocation
 in this project, including the Maven build run by ScanCentral Client during packaging
-(`-bt mvn`).
+(`-bt mvn`), but loading settings does not activate the profile.
+
+After setting the credential environment variables, opt in per command:
+
+```bash
+mvn -Pnexus -B clean verify
+mvn -Pnexus spring-boot:run
+```
+
+For Jenkins agents using Maven 3.9 or later, set the job's `MAVEN_ARGS` environment
+variable to `-Pnexus` to select the profile for both the Build stage and Maven
+subprocesses during ScanCentral packaging. Preserve any other required Maven
+arguments. Alternatively, add `-Pnexus` to [.mvn/maven.config](../.mvn/maven.config)
+in the private build environment; this makes all Maven invocations in that workspace
+opt in, including older Maven versions. The checked-in configuration intentionally
+does not activate it, so public builds remain the default.
+
+Maven does not support mirrors inside profiles. This profile replaces this project's
+Central dependency and plugin sources, rather than applying a wildcard mirror to
+every possible repository. If future dependencies add other repository IDs, review
+their routing too; use a dedicated mirror settings file for strict all-repository
+network enforcement. Releases are enabled and snapshots are disabled in this profile.
 
 The Jenkinsfile binds `nexus-credentials` during **Build** and supplies
 `credentials: [repository: 'nexus-credentials']` to the shared `fortifyCi` step, which binds
 these variables during bootstrap and ScanCentral packaging. For local builds, export the same
-variables in your shell.
+variables in your shell and activate `-Pnexus`. Credentials alone do not select the
+profile, and this Maven setting does not change npm or Fortify tooling downloads.
 
 ## 4. npm (`@fortify/setup`)
 

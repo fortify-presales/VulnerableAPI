@@ -64,7 +64,17 @@ Use an identity token rather than the account password.
 
 ## 3. Maven
 
-Update [.mvn/settings.xml](../.mvn/settings.xml) to point the mirror at Artifactory:
+Maven defaults to public Central. For optional Artifactory access, change both Nexus
+repository URLs in the `nexus` profile in [.mvn/settings.xml](../.mvn/settings.xml)
+to `https://artifactory.example.com/artifactory/maven-virtual/`, retain repository
+id `nexus` to match its server credentials, and activate `-Pnexus`. You can rename
+the profile independently if desired; update the activation command accordingly.
+See [profile activation for Jenkins and ScanCentral](nexus-mirroring.md#3-maven).
+
+If you instead require an unconditional wildcard mirror, add the following entry
+inside a top-level `<mirrors>` element in [.mvn/settings.xml](../.mvn/settings.xml).
+This alternative routes all Maven builds through Artifactory and removes the public
+default; Maven does not support mirrors inside profiles:
 
 ```xml
 <mirror>
