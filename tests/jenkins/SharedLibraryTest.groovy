@@ -321,7 +321,7 @@ check('application pipeline delegates to the library with existing parameters') 
     def consumer = new File('Jenkinsfile').text.replaceFirst(/(?m)^@Library[^\r\n]*\r?\n/, '')
     new GroovyShell(mock.binding).evaluate(consumer)
     assert mock.commands.contains('mvn -B clean verify')
-    assert mock.environments[0].SSC_APPVERSION == 'jenkins-fcli-scancentral:main'
+    assert mock.environments[0].SSC_APPVERSION == 'VulnerableApp-Jenkins:main'
     assert mock.environments[0].NPM_REGISTRY == 'https://repo.onfortify.com/repository/npm-public/'
     assert mock.reports.size() == 1
     assert mock.credentialScopes[0][0].credentialsId == 'nexus-credentials'

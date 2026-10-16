@@ -337,7 +337,7 @@ quota/access using an administrative onboarding process. SSC application-version
 does not create the Aviator application. With an authorized Aviator administrator configuration:
 
 ```bash
-fcli aviator app create "jenkins-fcli-scancentral"
+fcli aviator app create "VulnerableApp-Jenkins"
 ```
 
 Application creation alone does not establish the required quota or user access. Keep
@@ -346,8 +346,8 @@ contents as the Jenkins Secret text credential `aviator-token`; do not use a `fi
 Configure `AVIATOR_URL` as a non-secret endpoint, or pass `aviatorUrl` to the shared step.
 
 For `fcli action run ci`, `AVIATOR_APP` defaults to the SSC application name, without the
-version suffix. For example, `jenkins-fcli-scancentral:main` maps to the Aviator application
-`jenkins-fcli-scancentral`. If the name differs, set `AVIATOR_APP` in the job/folder environment
+version suffix. For example, `VulnerableApp-Jenkins:main` maps to the Aviator application
+`VulnerableApp-Jenkins`. If the name differs, set `AVIATOR_APP` in the job/folder environment
 or pipeline environment block:
 
 ```groovy
@@ -381,7 +381,7 @@ Do not place the token in source control, plain global environment variables, lo
 
 The pipeline explicitly passes `--branch-name` through `AVIATOR_REMEDIATIONS_EXTRA_OPTS`.
 Its destination is `aviator/remediations/<sanitized BUILD_TAG>`, for example
-`aviator/remediations/jenkins-fcli-scancentral_main-42`; if `BUILD_TAG` is unavailable,
+`aviator/remediations/VulnerableApp-Jenkins_main-42`; if `BUILD_TAG` is unavailable,
 it falls back to `aviator/remediations/build-<BUILD_NUMBER>`. The destination is logged before
 the CI action runs. No branch is pushed if there are no remediation changes to commit.
 

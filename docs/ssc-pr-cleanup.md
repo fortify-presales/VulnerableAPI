@@ -9,7 +9,7 @@ The example Jenkinsfile is [Jenkinsfile.ssc-pr-cleanup](../examples/jenkins/Jenk
 `VulnerbleApp-Jenkins:PR-42`.
 
 The GitHub repository is `fortify-presales/VulnerableApp-Jenkins`; the existing SSC
-application name remains `jenkins-fcli-scancentral`. Keep `SSC_APP_NAME` aligned
+application name remains `VulnerableApp-Jenkins`. Keep `SSC_APP_NAME` aligned
 with the scan jobs rather than renaming it to match GitHub. After deploying the
 updated cleanup Jenkinsfile, run the job once to apply the renamed-repository filter.
 

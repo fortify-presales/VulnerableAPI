@@ -14,7 +14,7 @@ pipeline {
     }
 
     parameters {
-        string(name: 'SSC_APP_NAME', defaultValue: 'jenkins-fcli-scancentral', description: 'SSC application name')
+        string(name: 'SSC_APP_NAME', defaultValue: 'VulnerableApp-Jenkins', description: 'SSC application name')
         string(name: 'ISSUE_TEMPLATE', defaultValue: 'Prioritized High Risk Issue Template', description: 'SSC issue template name or id used when creating a new application version')
         string(name: 'SAST_SENSOR_POOL', defaultValue: '', description: 'Optional ScanCentral SAST sensor pool name or UUID; leave blank for server-side pool selection')
         string(name: 'DAST_SETTINGS', defaultValue: '', description: 'Numeric ScanCentral DAST scan-settings ID for this application (required when ENABLE_DAST_SCAN is enabled)')
