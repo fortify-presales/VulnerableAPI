@@ -29,10 +29,9 @@ it or that Agentic Analyzer will report it; compare results from both scan modes
 that behavior for your configuration.
 
 The account endpoint requires a servlet `Principal` but does not verify that the requested
-username belongs to that principal. With an authentication layer supplying the principal,
-an authenticated user can change the username in the URL to read another user's email and
-balance. The sample does not configure authentication itself; the test supplies a principal
-to demonstrate the missing object-level authorization. This is an intentional IDOR test case,
+username belongs to that principal. Log in through `/login` and send the returned token as
+`Authorization: Bearer <token>` to supply the principal. An authenticated user can change
+the username in the URL to read another user's email and balance. This is an intentional IDOR test case,
 not a guarantee that either Fortify analyzer will report it.
 
 ## Build locally
@@ -55,6 +54,35 @@ The `nexus` profile in [.mvn/settings.xml](.mvn/settings.xml) routes dependencie
 and plugins to Nexus and disables Central while active. See
 [Nexus configuration](docs/nexus-mirroring.md#3-maven) for Jenkins and ScanCentral.
 
+## Swagger UI
+
+With the app running locally, open [Swagger UI](http://localhost:8080/swagger-ui.html)
+to browse all API endpoints and execute requests with **Try it out**. The generated
+OpenAPI document is available at [OpenAPI JSON](http://localhost:8080/v3/api-docs).
+The `/deserialize` operation accepts a binary Java serialized object file; `/xml`
+accepts an XML request body.
+
+On startup, the app creates `sample.txt` in `app.files.base-dir` (default
+`/tmp/vulnapp-files`) without overwriting an existing file. Swagger's `/files`
+`name` field defaults to `sample.txt`. The configured directory must be writable
+by the app; containers can use a writable volume and override the setting with
+`APP_FILES_BASE_DIR`.
+
+To test authenticated account access:
+
+1. Execute `/login` with the default `alice` / `password` credentials.
+2. Copy the plain-text response token into **Authorize**, without a `Bearer` prefix.
+3. Execute `/accounts/bob`. Reading Bob's account as Alice demonstrates the intentional IDOR.
+
+API clients send `Authorization: Bearer <token>` on account requests. Tokens expire after
+one hour, are held in memory on one app instance, and are lost on restart. No session
+cookie is created. Missing, invalid, or expired credentials return **401**. All other
+endpoints remain public. Token generation deliberately retains the weak randomness demo;
+this authentication is not suitable for production or multi-instance deployments.
+
+Requests execute the real, intentionally vulnerable endpoints and can change data or
+trigger side effects. Keep the app local and use only trusted test inputs.
+
 ## Postman testing
 
 Import [the literal Postman collection](postman/vulnapp.postman_collection.json)
@@ -63,8 +91,9 @@ endpoint except `/ping`. All values are literal and default to `http://localhost
 no environment is required. Alternatively, use
 [the environment collection](postman/vulnapp-environment.postman_collection.json)
 with [the local environment file](postman/vulnapp-local.postman_environment.json).
-Login does not establish an authenticated session, so the account request expects
-**401**, even after login.
+The literal collection leaves the account request anonymous and expects **401**.
+The environment collection captures `loginToken` and uses Bearer authentication on
+the account request, which expects **200** after the seeded-user login.
 
 See [the Postman testing guide](docs/postman-testing.md) for setup, credentials,
 environment variables, Newman commands, expected responses, and DAST considerations.

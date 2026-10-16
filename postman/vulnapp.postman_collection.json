@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Vulnapp - Literal API Tests",
-    "description": "For this intentionally vulnerable application in an isolated local environment only. All request values are literal; no Postman variables or environment are used. Defaults target http://localhost:8080: replace the request URLs with an address reachable from your client or DAST sensor before remote use. Demo credentials are included. Login returns a random string, not an authenticated session. Requests use No Auth; account access expects 401. Transfers mutate in-memory balances. File download is skipped by a pre-request script: create the server-side fixture and remove that script to enable it. A DAST importer may not honor Postman scripts, including this skip. Deserialization is an invalid-stream negative test, not successful deserialization. No ScanCentral DAST compatibility is implied.",
+    "description": "For this intentionally vulnerable application in an isolated local environment only. All request values are literal; no Postman variables or environment are used. Defaults target http://localhost:8080: replace the request URLs with an address reachable from your client or DAST sensor before remote use. Demo credentials are included. Login returns a functional Bearer token, but this literal collection does not store or send it. Requests use No Auth; anonymous account access expects 401. Use the environment collection for automatic account authentication. Transfers mutate in-memory balances. File download is skipped by a pre-request script: create the server-side fixture and remove that script to enable it. A DAST importer may not honor Postman scripts, including this skip. Deserialization is an invalid-stream negative test, not successful deserialization. No ScanCentral DAST compatibility is implied.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": { "type": "noauth" },
@@ -25,7 +25,7 @@
               { "key": "password", "value": "password", "type": "text" }
             ] },
             "url": "http://localhost:8080/login",
-            "description": "Demo credentials alice/password match the seeded user. The response token is not stored or used. The app does not accept it as Bearer authentication or create a servlet Principal. Other seeded credentials: bob/abc123 and carol/12345678."
+            "description": "Demo credentials alice/password match the seeded user. The response token authenticates account requests as a Bearer token, but this literal collection does not store or send it. Use the environment collection for that flow. Other seeded credentials: bob/abc123 and carol/12345678."
           }
         },
         {
@@ -83,11 +83,11 @@
         {
           "name": "Account - no authenticated principal",
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-            "pm.test('Standalone app has no authenticated principal', () => pm.response.to.have.status(401));"
+            "pm.test('Account access without a token is rejected', () => pm.response.to.have.status(401));"
           ] } }],
           "request": {
             "method": "GET", "header": [], "url": "http://localhost:8080/accounts/alice",
-            "description": "Expected 401 in the standalone application, including after a successful login. Access requires an external authentication layer that supplies a servlet Principal; adding arbitrary Bearer or Basic headers does not do that. If such a layer is installed, configure its actual authentication and update this assertion to suit that deployment."
+            "description": "Expected 401 because this request sends no token, even after login. For manual authenticated testing, set Bearer Token authorization to the actual login response and update the assertion to expect 200. The environment collection automates token capture and account authentication."
           }
         }
       ]

@@ -24,6 +24,5 @@ scan.fpr
 aviator-demos.txt
 fortifypackage.zip
 VulnerableApp-Jenkins-main.zip
-.gitignore
-.fortify/fcli-all-commands.json
-.gitignore
+debricked.fingerprints.txt
+maven.debricked.lock

@@ -110,18 +110,21 @@ Other seeded credentials are `bob` / `abc123` and `carol` / `12345678`.
 These are intentionally insecure sample credentials, not deployment secrets.
 The datasource password is unrelated to API login.
 
-`POST /login` returns a random hexadecimal string. In the environment collection,
-the seeded-user login stores it in environment variable `loginToken` for inspection;
-the literal collection does not store it. The application
-does not validate that token, issue an authenticated session cookie, or configure
-Spring Security. Requests therefore use **No Auth**; there is no Bearer-token setup
-step to perform. An invalid-login request verifies the `401` response.
+`POST /login` returns a plain-text hexadecimal Bearer token. The environment collection
+stores the seeded-user token in `loginToken` and sends it on the account request, which
+expects **200**. Run the seeded-user login first when executing individual requests.
+The literal collection does not store or send the token; its anonymous account request
+still expects **401**. To test it manually, copy the login response into the account
+request's Bearer Token authorization field and change its expected status to **200**.
 
-`GET /accounts/{username}` requires a servlet `Principal`, which the standalone app
-does not supply. Its collection request expects **401**, including after login.
-Adding Basic or Bearer headers alone will not enable account access. If testing a
-deployment with an external authentication layer that supplies a principal, configure
-that layer's actual authentication on the account request and update its assertion.
+`GET /accounts/{username}` is the only endpoint requiring authentication. The token
+supplies a servlet `Principal`, but the endpoint intentionally does not check account
+ownership: log in as Alice and request Bob's account to demonstrate IDOR. Missing,
+invalid, or expired tokens return **401**. Tokens expire after one hour, are stored
+in memory on a single app instance, and are lost on restart. No authenticated session
+cookie is issued. Weak token randomness is retained intentionally; this is not
+production authentication. Other requests remain **No Auth**. An invalid-login request
+verifies **401** and `Invalid credentials`.
 
 ## Environment variables
 
@@ -137,7 +140,7 @@ credentials or an exported environment containing a real token.
 | `baseUrl` | `http://localhost:8080` | URL reached by Postman |
 | `username`, `password` | `alice`, `password` | Seeded-user login; `username` also drives user lookup |
 | `adminUsername`, `adminPassword` | `admin`, `P@ssw0rd!` | Demo admin login |
-| `loginToken` | Empty | Captured login response; not used for authorization |
+| `loginToken` | Empty | Captured seeded-user token used for account Bearer authorization |
 | `accountUsername` | `alice` | Account path parameter |
 | `transferFrom`, `transferTo` | `alice`, `bob` | Transfer accounts |
 | `transferAmount` | `1.00` | Amount transferred on each run |
@@ -158,7 +161,7 @@ targets; update those assertions if changing the sample content.
 | Seeded-user and admin login | `200` with hexadecimal token |
 | Invalid login | `401` with `Invalid credentials` |
 | User lookup | `200` with the requested seeded user |
-| Account lookup | `401` without an externally supplied principal |
+| Account lookup | Environment collection: `200` after login; literal collection: `401` without a token |
 | Transfer | `200` with `Transfer complete` |
 | Transfer to unknown recipient | `400` with `Unknown recipient` |
 | Greeting | `200` containing `Hello Postman` |

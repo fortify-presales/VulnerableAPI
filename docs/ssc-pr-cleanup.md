@@ -27,8 +27,8 @@ the example so cleanup targets exactly the version created by the scan job.
    is the protected `main` branch. Do not run this Jenkinsfile as a multibranch PR job.
 2. Install the **Generic Webhook Trigger** plugin. The agent needs Node.js/npm and the `linux && node` label; it
    does not need Docker or the Docker Pipeline plugin.
-3. Configure `SSC_URL` in the job or folder environment. Add Jenkins Secret Text credential `ssc-ci-token` with
-   an SSC identity authorized to delete application versions, plus Username with password credential
+3. Configure `SSC_URL` in the job or folder environment. Add Jenkins Secret Text credential `ssc-pr-cleanup-token` with
+   an SSC token issued for the cleanup identity (see below), plus Username with password credential
    `nexus-credentials` with read access to the npm mirror. The Jenkinsfile pins `@fortify/setup` to major version
    2 and fcli to `v3.28.1`; update `FCLI_VERSION` when intentionally upgrading. Add Secret Text credential
    `ssc-pr-cleanup-webhook-token` for the Generic Webhook Trigger.
@@ -44,6 +44,28 @@ the example so cleanup targets exactly the version created by the scan job.
 The Generic Webhook Trigger token can cause the job to run with Jenkins `SYSTEM` authority. Treat the endpoint
 and token as privileged: restrict access to the signed webhook relay, keep the Jenkinsfile on protected `main`,
 and do not grant the cleanup job unrelated credentials.
+
+## Dedicated SSC Cleanup Credential
+
+The cleanup job binds `ssc-pr-cleanup-token` to `SSC_TOKEN` for its SSC login. Scan jobs continue to use
+`ssc-ci-token`; do not replace that shared credential with an administrator token.
+
+To run cleanup as an SSC administrator:
+
+1. In SSC, issue a token for the administrator identity that permits the required application-version deletion
+   operations. Prefer a dedicated service account with only the necessary permissions when possible.
+2. In Jenkins, open **Credentials** for a restricted folder containing the cleanup job and add a **Secret text**
+   credential. Set **ID** to `ssc-pr-cleanup-token` and **Secret** to the SSC token. Do not put the token in the
+   Jenkinsfile or build parameters.
+3. Restrict folder access and job configuration permissions to trusted administrators. Folder credentials are
+   available to jobs in that folder and its subfolders, not exclusively to this job. Keep untrusted PR jobs out
+   of the folder and keep the cleanup pipeline definition on protected `main`.
+4. Deploy the updated Jenkinsfile and run **Build with Parameters** with `PR_ACTION=closed`,
+   `BASE_REPO=fortify-presales/VulnerableApp-Jenkins`, a known `PR_NUMBER`, and `DRY_RUN` checked. Confirm the
+   expected SSC version is returned before allowing deletion.
+
+The SSC identity comes from the token used by `fcli ssc session login`, not from the Jenkins user who starts
+the build. Jenkins does not need to run the job as a Jenkins administrator for SSC administrator access.
 
 ## Deletion Behavior
 
