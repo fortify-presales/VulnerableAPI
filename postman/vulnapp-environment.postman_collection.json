@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Vulnapp - Environment API Tests",
-    "description": "Import and select vulnapp-local.postman_environment.json before running. Request placeholders resolve from the selected Postman environment; there are no collection variables. For an isolated local instance of this intentionally vulnerable app only. Login captures loginToken in the environment for inspection, not authorization: the app does not validate tokens or establish a Principal. Account access expects 401. Transfers mutate balances. File download is skipped unless the environment fileReady value is true. DAST importers may not execute scripts or support environment files; use the literal collection where variable substitution is unavailable. Do not expose this intentionally vulnerable application publicly.",
+    "description": "Import and select vulnapp-local.postman_environment.json before running. Request placeholders resolve from the selected Postman environment; there are no collection variables. For an isolated local instance of this intentionally vulnerable app only. Seeded-user login captures loginToken for Bearer authentication on the account request, which expects 200. Tokens expire after one hour or app restart and belong to one app instance. Transfers mutate balances. File download is skipped unless the environment fileReady value is true. DAST importers may not execute scripts or support environment files; use the literal collection where variable substitution is unavailable. Do not expose this intentionally vulnerable application publicly.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": { "type": "noauth" },
@@ -26,7 +26,7 @@
               { "key": "username", "value": "{{username}}", "type": "text" },
               { "key": "password", "value": "{{password}}", "type": "text" }
             ] },
-            "description": "Defaults to alice/password from the environment. Stores the demo token in environment loginToken for inspection only; this token cannot authenticate later requests."
+            "description": "Defaults to alice/password from the environment. Stores the plain-text demo token in loginToken for Bearer authentication on account requests. Tokens expire after one hour or app restart."
           }
         },
         {
@@ -80,13 +80,15 @@
           }
         },
         {
-          "name": "Account - no authenticated principal",
+          "name": "Account - authenticated lookup (intentional IDOR)",
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
-            "pm.test('Standalone app has no authenticated principal', () => pm.response.to.have.status(401));"
+            "pm.test('Authenticated account lookup succeeds', () => pm.response.to.have.status(200));",
+            "pm.test('Returns the requested account', () => pm.expect(pm.response.json().username).to.eql(pm.environment.get('accountUsername')));"
           ] } }],
           "request": {
             "method": "GET", "header": [], "url": "{{baseUrl}}/accounts/{{accountUsername}}",
-            "description": "Expected 401, including after login. Successful access requires an external authentication layer that supplies a servlet Principal; arbitrary Basic or Bearer headers do not do that."
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{loginToken}}", "type": "string" }] },
+            "description": "Run seeded-user login first to populate loginToken. Expected 200 with its Bearer token. Set accountUsername to bob while logged in as alice to demonstrate missing account ownership validation. Missing, invalid, or expired tokens return 401."
           }
         }
       ]

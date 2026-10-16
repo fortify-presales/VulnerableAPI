@@ -4,6 +4,9 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,10 +25,18 @@ public class TransferController {
 
     @Transactional
     @PostMapping("/transfer")
+        @Operation(summary = "Transfer funds - negative-amount business-logic flaw",
+            description = "Intentionally omits positive-amount validation and sender authorization. "
+                + "The default transfers 100 from alice to bob and changes real demo balances. "
+                + "An amount of -100 reverses the balance updates, crediting the sender. "
+                + "Repeated positive transfers may fail when the sender has insufficient funds.")
     public ResponseEntity<String> transfer(
-            @RequestParam String from,
-            @RequestParam String to,
-            @RequestParam BigDecimal amount) {
+            @Parameter(description = "Sender account username whose balance is debited.",
+                schema = @Schema(defaultValue = "alice")) @RequestParam String from,
+            @Parameter(description = "Recipient account username whose balance is credited.",
+                schema = @Schema(defaultValue = "bob")) @RequestParam String to,
+            @Parameter(description = "Decimal amount to transfer; negative values intentionally reverse the transfer.",
+                schema = @Schema(defaultValue = "100")) @RequestParam BigDecimal amount) {
         List<Map<String, Object>> recipients = jdbcTemplate.queryForList(
                 "SELECT username FROM accounts WHERE username = ?", to);
         if (recipients.isEmpty()) {
