@@ -1,0 +1,178 @@
+name: Fortify ScanCentral SAST and Debricked
+
+on:
+  push:
+    branches: [ main, 'feature/**' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      sast_sensor_pool:
+        description: Optional ScanCentral SAST sensor pool name or UUID; blank for server-side pool selection
+        type: string
+        default: ''
+      scan_policy:
+        description: Scan policy override; blank derives devops for feature/* and security otherwise
+        type: choice
+        options: [ '', devops, security, classic ]
+        default: ''
+      enable_debricked_scan:
+        description: Run a Debricked SCA scan (requires the DEBRICKED_TOKEN secret)
+        type: boolean
+        default: true
+      enable_dast_scan:
+        description: Run a ScanCentral DAST scan
+        type: boolean
+        default: false
+      dast_settings:
+        description: ScanCentral DAST scan-settings id or CI/CD token (defaults to the DAST_SETTINGS variable)
+        type: string
+        default: ''
+      wait_for_dast:
+        description: Wait for the DAST scan to finish; requires enable_dast_scan
+        type: boolean
+        default: false
+      enable_aviator_audit:
+        description: Send SAST results to Aviator for auditing
+        type: boolean
+        default: false
+      enable_aviator_remediations:
+        description: Audit findings, apply Aviator remediations and open a remediation PR (preview)
+        type: boolean
+        default: false
+      enable_check_policy:
+        description: Check the SSC policy after scans complete
+        type: boolean
+        default: false
+      export_sarif:
+        description: Export SAST/Debricked results to GitHub code scanning
+        type: boolean
+        default: true
+
+env:
+  SSC_APP_NAME: VulnerableApp-GHA
+
+concurrency:
+  # Shared with ssc-pr-cleanup.yml so a scan and cleanup never touch the same SSC version at once.
+  group: ssc-VulnerableApp-GHA-${{ github.event_name == 'pull_request' && format('PR-{0}', github.event.pull_request.number) || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  Fortify-ScanCentral-Scan:
+    # Fortify secrets must not be exposed to fork pull requests.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      pull-requests: write
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Resolve Fortify settings
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_REF: ${{ github.head_ref }}
+          REF_NAME: ${{ github.ref_name }}
+          ISSUE_TEMPLATE: ${{ vars.SSC_ISSUE_TEMPLATE || 'Prioritized High Risk Issue Template' }}
+          PARENT_BRANCH: ${{ vars.FORTIFY_PARENT_BRANCH || 'main' }}
+          SENSOR_POOL: ${{ inputs.sast_sensor_pool || vars.FORTIFY_SENSOR_POOL }}
+          SCAN_POLICY: ${{ inputs.scan_policy }}
+          DAST_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.enable_dast_scan }}
+          DAST_WAIT: ${{ github.event_name == 'workflow_dispatch' && inputs.wait_for_dast }}
+          DAST_SETTINGS_INPUT: ${{ inputs.dast_settings || vars.DAST_SETTINGS }}
+          REMEDIATIONS_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.enable_aviator_remediations }}
+          HAS_GIT_PUSH_TOKEN: ${{ secrets.GIT_PUSH_TOKEN != '' }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$1"; exit 1; }
+
+          if [ "$EVENT_NAME" = pull_request ]; then
+            version="PR-${PR_NUMBER}"
+            scan_branch="$HEAD_REF"
+          else
+            version="$REF_NAME"
+            scan_branch="$REF_NAME"
+          fi
+          case "$version" in *:*) fail "SSC version name must not contain ':' ($version)";; esac
+
+          feature=false
+          case "$scan_branch" in feature/*) feature=true;; esac
+
+          policy="$SCAN_POLICY"
+          if [ -z "$policy" ]; then
+            if $feature; then policy=devops; else policy=security; fi
+          fi
+          if [ "$policy" = devops ] && ! $feature; then
+            fail "Use security or classic on non-feature branches; devops is only allowed for feature/*"
+          fi
+
+          setup_opts="--issue-template \"${ISSUE_TEMPLATE}\""
+          if $feature; then
+            setup_opts+=" --copy-from \"${SSC_APP_NAME}:${PARENT_BRANCH}\""
+          fi
+
+          scan_opts=""
+          if [ -n "$SENSOR_POOL" ]; then
+            [[ "$SENSOR_POOL" =~ ^[A-Za-z0-9][A-Za-z0-9\ ._-]*$ ]] || fail "Invalid sensor pool name"
+            scan_opts="--pool \"${SENSOR_POOL}\" "
+          fi
+          scan_opts+="--sargs \"-scan-policy ${policy}\""
+
+          if [ "$DAST_WAIT" = true ] && [ "$DAST_ENABLED" != true ]; then
+            fail "wait_for_dast requires enable_dast_scan"
+          fi
+          if [ "$DAST_ENABLED" = true ]; then
+            [[ "$DAST_SETTINGS_INPUT" =~ ^[A-Za-z0-9-]+$ ]] || fail "Set a valid dast_settings input or DAST_SETTINGS variable"
+          fi
+          if [ "$REMEDIATIONS_ENABLED" = true ] && [ "$HAS_GIT_PUSH_TOKEN" != true ]; then
+            fail "Aviator remediations require the GIT_PUSH_TOKEN secret"
+          fi
+
+          echo "Fortify target: ${SSC_APP_NAME}:${version}; scan policy: ${policy}"
+          {
+            echo "SSC_APPVERSION=${SSC_APP_NAME}:${version}"
+            echo "SETUP_EXTRA_OPTS=${setup_opts}"
+            echo "SAST_SCAN_EXTRA_OPTS=${scan_opts}"
+            echo "DAST_SETTINGS=${DAST_SETTINGS_INPUT}"
+          } >> "$GITHUB_ENV"
+
+      - name: Run Fortify ScanCentral SAST and Debricked scan
+        uses: fortify/github-action@v3
+        env:
+          SSC_URL: ${{ vars.SSC_URL }}
+          SSC_TOKEN: ${{ secrets.SSC_TOKEN }}
+          SC_SAST_TOKEN: ${{ secrets.SC_SAST_TOKEN }}
+          SC_CLIENT_VERSION: ${{ vars.SC_CLIENT_VERSION || 'auto' }}
+          PACKAGE_EXTRA_OPTS: -bt mvn
+          DO_SETUP: true
+          DO_SAST_SCAN: true
+          DO_WAIT: true
+          DO_SAST_WAIT: true
+          DO_APPVERSION_SUMMARY: true
+          DO_JOB_SUMMARY: true
+          DO_PR_COMMENT: ${{ github.event_name == 'pull_request' }}
+          DO_DEBRICKED_SCAN: ${{ secrets.DEBRICKED_TOKEN != '' && (github.event_name != 'workflow_dispatch' || inputs.enable_debricked_scan) }}
+          DEBRICKED_ACCESS_TOKEN: ${{ secrets.DEBRICKED_TOKEN }}
+          DO_DAST_SCAN: ${{ github.event_name == 'workflow_dispatch' && inputs.enable_dast_scan }}
+          DO_DAST_WAIT: ${{ github.event_name == 'workflow_dispatch' && inputs.wait_for_dast }}
+          AVIATOR_URL: ${{ vars.AVIATOR_URL }}
+          AVIATOR_TOKEN: ${{ secrets.AVIATOR_TOKEN }}
+          AVIATOR_APP: ${{ env.SSC_APP_NAME }}
+          DO_AVIATOR_AUDIT: ${{ github.event_name == 'workflow_dispatch' && (inputs.enable_aviator_audit || inputs.enable_aviator_remediations) }}
+          DO_AVIATOR_REMEDIATIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.enable_aviator_remediations }}
+          GIT_PUSH_TOKEN: ${{ secrets.GIT_PUSH_TOKEN }}
+          DO_CHECK_POLICY: ${{ github.event_name == 'workflow_dispatch' && inputs.enable_check_policy }}
+          DO_SAST_EXPORT: ${{ github.event_name != 'workflow_dispatch' || inputs.export_sarif }}
+          DO_DEBRICKED_EXPORT: ${{ github.event_name != 'workflow_dispatch' || inputs.export_sarif }}

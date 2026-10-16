@@ -1,0 +1,39 @@
+name: Deploy to Railway
+
+on:
+  workflow_run:
+    workflows: [ Build ]
+    types: [ completed ]
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: railway-deploy
+  cancel-in-progress: true
+
+jobs:
+  Deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out built commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Install Railway CLI
+        run: npm install --global @railway/cli
+
+      - name: Deploy with Railway
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE || 'vulnerable-app' }}
+        run: |
+          set -euo pipefail
+          [ -n "$RAILWAY_TOKEN" ] || { echo "::error::Configure the RAILWAY_TOKEN secret (Railway project token)."; exit 1; }
+          railway up --ci --service "$RAILWAY_SERVICE"

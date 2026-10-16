@@ -1,5 +1,5 @@
-# VulnerableApp-Jenkins
-Java project with Jenkins build and ScanCentral integration via fcli
+# VulnerableApp
+Java project with Jenkins/GitHub Actions build and ScanCentral integration via fcli
 
 > **Warning:** This application is intentionally insecure and exists only to exercise
 > Fortify SAST. Never deploy it or expose it on a network.
@@ -534,3 +534,106 @@ References: [Fortify setup](https://github.com/fortify/fortify-setup-js/blob/mai
 [Aviator SAST audit](https://fortify.github.io/fcli/latest/manpage/fcli-aviator-ssc-audit-sast.html),
 [ScanCentral scan options](https://fortify.github.io/fcli/latest/manpage/fcli-sc-sast-scan-start.html),
 and [Warnings NG pipeline steps](https://www.jenkins.io/doc/pipeline/steps/warnings-ng/).
+
+## GitHub Actions
+
+The GitHub Actions workflows in [.github/workflows](.github/workflows) are equivalents of
+the Jenkins pipelines for the `fortify-presales/VulnerableApp` repository. Results are
+stored in SSC under the separate application `VulnerableApp-GHA`, so Jenkins
+(`VulnerableApp-Jenkins`) and GitHub Actions results never mix.
+
+| Workflow | Jenkins equivalent | Purpose |
+|---|---|---|
+| [build.yml](.github/workflows/build.yml) | `Build` stage | `mvn -B clean verify`, uploads the jar and test reports, builds the Docker image and pushes `ghcr.io/fortify-presales/vulnerable-app` (`latest` and commit SHA) on `main` |
+| [scancentral.yml](.github/workflows/scancentral.yml) | `fortifyCi` / `Security` stage | ScanCentral SAST and Debricked SCA via `fortify/github-action@v3`, optional DAST, Aviator, policy check, PR comment and GitHub code scanning export |
+| [ssc-pr-cleanup.yml](.github/workflows/ssc-pr-cleanup.yml) | [Jenkinsfile.ssc-pr-cleanup](examples/jenkins/Jenkinsfile.ssc-pr-cleanup) | Deletes `VulnerableApp-GHA:PR-<n>` when a pull request is closed |
+| [deploy-railway.yml](.github/workflows/deploy-railway.yml) | none | Deploys the Dockerfile build to the Railway service `vulnerable-app` after a successful `main` build |
+
+### SSC Application Versions
+
+| Trigger | SSC application version | Scan policy | Copied from |
+|---|---|---|---|
+| Push to `main` | `VulnerableApp-GHA:main` | `security` | - |
+| Push to `feature/x` | `VulnerableApp-GHA:feature/x` | `devops` | `VulnerableApp-GHA:main` |
+| Pull request #42 | `VulnerableApp-GHA:PR-42` | `devops` for `feature/*` heads, otherwise `security` | `VulnerableApp-GHA:main` for `feature/*` heads |
+
+The rules match `fortifyCi`: `devops` is rejected on non-feature branches, the issue template
+is applied when a version is created, and fork pull requests are skipped because repository
+secrets must not be exposed to them. Scans and cleanup share a concurrency group per SSC
+version, so a cleanup never races a running scan of the same pull request.
+
+Manual runs (**Actions > Fortify ScanCentral SAST and Debricked > Run workflow**) expose the
+same options as the Jenkins parameters: sensor pool, scan policy, Debricked, DAST settings and
+wait, Aviator audit and remediations, policy check, and SARIF export. Push and pull-request
+runs use the Jenkins defaults (SAST, Debricked when configured, export on; others off).
+
+### Repository Secrets and Variables
+
+Configure these under **Settings > Secrets and variables > Actions**:
+
+| Name | Type | Required | Purpose |
+|---|---|---|---|
+| `SSC_URL` | Variable | Yes | SSC URL (not a secret) |
+| `SSC_TOKEN` | Secret | Yes | SSC CIToken (Jenkins `ssc-ci-token`) |
+| `SC_SAST_TOKEN` | Secret | Yes | ScanCentral SAST client auth token (Jenkins `sc-client-auth-token`) |
+| `DEBRICKED_TOKEN` | Secret | No | Debricked access token; Debricked runs only when set (Jenkins `debricked-access-token`) |
+| `SSC_ISSUE_TEMPLATE` | Variable | No | Defaults to `Prioritized High Risk Issue Template` |
+| `FORTIFY_PARENT_BRANCH` | Variable | No | Version copied for `feature/*` branches; defaults to `main` |
+| `FORTIFY_SENSOR_POOL` | Variable | No | Default ScanCentral SAST sensor pool |
+| `SC_CLIENT_VERSION` | Variable | No | ScanCentral Client version; defaults to `auto` |
+| `DAST_SETTINGS` | Variable | No | Default ScanCentral DAST scan-settings id or CI/CD token |
+| `AVIATOR_URL` | Variable | No | Aviator URL |
+| `AVIATOR_TOKEN` | Secret | No | Aviator JWT (Jenkins `aviator-token`) |
+| `GIT_PUSH_TOKEN` | Secret | No | Fine-grained PAT with Contents and Pull requests write, used by Aviator remediations (Jenkins `git-push-token`) |
+| `SSC_PR_CLEANUP_TOKEN` | Secret | For cleanup | Separate SSC token allowed to delete versions of `VulnerableApp-GHA` (Jenkins `ssc-pr-cleanup-token`) |
+| `SSC_CLEANUP_MERGED_ONLY` | Variable | No | `true` deletes only merged pull-request versions |
+| `RAILWAY_TOKEN` | Secret | For deploy | Railway project token |
+| `RAILWAY_SERVICE` | Variable | No | Railway service; defaults to `vulnerable-app` |
+
+The issue template must exist in SSC. Aviator needs the same one-time onboarding as Jenkins,
+using the GitHub Actions application name:
+
+```bash
+fcli aviator app create "VulnerableApp-GHA"
+```
+
+On GitHub, Aviator remediations are committed to a new branch and a pull request is opened
+by the fcli `github-remediations-pr` action (preview), instead of the branch-only push used
+by Jenkins.
+
+To test pull-request cleanup without deleting anything, run **SSC PR Cleanup** manually with
+the PR number and `dry_run` checked.
+
+### Container Image and Railway
+
+The [Dockerfile](Dockerfile) builds the jar with Maven and runs it on a JRE as a non-root user.
+It listens on `$PORT` when set (Railway), otherwise on 8080:
+
+```bash
+docker build -t vulnerable-app .
+docker run --rm -p 8080:8080 vulnerable-app
+```
+
+GHCR packages are private by default; make `vulnerable-app` public under the package settings
+if it should be pulled anonymously. The Railway service `vulnerable-app` is served at
+`https://vulnerable-app-production.up.railway.app`, which
+[the production Postman environment](fortify/vulnapp-prod.postman_environment.json) and
+[api-docs.json](fortify/api-docs.json) reference. Exposing this intentionally vulnerable
+application publicly is only appropriate for isolated, disposable demo environments.
+
+### GitHub Enterprise Server
+
+`actions/upload-artifact@v4` and the GitHub code scanning export require GHES 3.13 or later
+and GitHub Advanced Security (code scanning) to be enabled. On older GHES releases use
+`actions/upload-artifact@v3` and set `export_sarif` to false (or `DO_SAST_EXPORT: false`).
+Verify that `fortify/github-action`, `docker/*`, and `actions/*` are available to the
+instance (GitHub Connect or a synced mirror).
+
+### First-Run Verification
+
+1. Configure `SSC_URL`, `SSC_TOKEN`, and `SC_SAST_TOKEN`, then run the scan workflow manually
+   on `main` with optional integrations off; confirm `VulnerableApp-GHA:main` is created and
+   the job summary and code scanning alerts appear.
+2. Add `DEBRICKED_TOKEN` and re-run; confirm Debricked results are uploaded to SSC.
+3. Open a pull request from a `feature/*` branch; confirm `VulnerableApp-GHA:PR-<n>` is
+   copied from `main` and a PR comment is posted. Close it and confirm cleanup.

@@ -1,0 +1,15 @@
+.git
+.github
+.fortify
+target
+docs
+docker
+examples
+fortify
+faa-per-finding
+tests
+vars
+*.fpr
+*.zip
+*.ps1
+Jenkinsfile*

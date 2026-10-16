@@ -1,0 +1,76 @@
+name: SSC PR Cleanup
+
+on:
+  pull_request:
+    types: [ closed ]
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number whose SSC version (PR-<n>) should be deleted
+        type: string
+        required: true
+      dry_run:
+        description: Only show the matching SSC version without deleting it
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+env:
+  SSC_APP_NAME: VulnerableApp-GHA
+  SSC_VERSION_PREFIX: PR-
+
+concurrency:
+  # Shared with scancentral.yml so cleanup never races a scan of the same PR version.
+  group: ssc-VulnerableApp-GHA-PR-${{ github.event.pull_request.number || inputs.pr_number }}
+  cancel-in-progress: false
+
+jobs:
+  SSC-PR-Cleanup:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.head.repo.full_name == github.repository &&
+       (vars.SSC_CLEANUP_MERGED_ONLY != 'true' || github.event.pull_request.merged))
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up fcli
+        uses: fortify/github-action/setup@v3
+        with:
+          fcli: bootstrapped
+        env:
+          FCLI_BOOTSTRAP_VERSION: v3.28.1
+
+      - name: Inspect or delete SSC application version
+        shell: bash
+        env:
+          SSC_URL: ${{ vars.SSC_URL }}
+          SSC_TOKEN: ${{ secrets.SSC_PR_CLEANUP_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo "::error::Invalid PR number"; exit 1; }
+          [ -n "$SSC_TOKEN" ] || { echo "::error::Configure the SSC_PR_CLEANUP_TOKEN secret"; exit 1; }
+          version_name="${SSC_VERSION_PREFIX}${PR_NUMBER}"
+
+          fcli ssc session login --url "$SSC_URL" -t "$SSC_TOKEN" --ssc-session gha-cleanup
+          trap 'fcli ssc session logout --ssc-session gha-cleanup || true' EXIT
+
+          query="application.name=='${SSC_APP_NAME}' && name=='${version_name}'"
+          ids=$(fcli ssc appversion list --query "$query" -o 'expr={id}' --ssc-session gha-cleanup)
+          if [ -z "$ids" ]; then
+            echo "No SSC version ${SSC_APP_NAME}:${version_name} found; nothing to delete."
+            exit 0
+          fi
+          case "$ids" in
+            *[!0-9]*) echo "::error::Expected exactly one numeric SSC application-version ID"; exit 1;;
+          esac
+
+          fcli ssc appversion get "$ids" -o json --ssc-session gha-cleanup
+          if [ "$DRY_RUN" = true ]; then
+            echo "Dry run: no SSC data was deleted"
+            exit 0
+          fi
+          fcli ssc appversion delete "$ids" --ssc-session gha-cleanup
