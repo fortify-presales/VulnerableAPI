@@ -85,12 +85,12 @@ trigger side effects. Keep the app local and use only trusted test inputs.
 
 ## Postman testing
 
-Import [the literal Postman collection](postman/vulnapp.postman_collection.json)
+Import [the literal Postman collection](fortify/vulnapp.postman_collection.json)
 for 14 requests with response assertions and demo logins, covering every controller
 endpoint except `/ping`. All values are literal and default to `http://localhost:8080`;
 no environment is required. Alternatively, use
-[the environment collection](postman/vulnapp-environment.postman_collection.json)
-with [the local environment file](postman/vulnapp-local.postman_environment.json).
+[the environment collection](fortify/vulnapp-environment.postman_collection.json)
+with [the local environment file](fortify/vulnapp-local.postman_environment.json).
 The literal collection leaves the account request anonymous and expects **401**.
 The environment collection captures `loginToken` and uses Bearer authentication on
 the account request, which expects **200** after the seeded-user login.

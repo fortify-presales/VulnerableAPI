@@ -6,9 +6,9 @@ from the current collections.
 
 | File | Usage |
 |---|---|
-| [Literal collection](../postman/vulnapp.postman_collection.json) | No Postman variables or environment required; edit literal request values directly |
-| [Environment collection](../postman/vulnapp-environment.postman_collection.json) | Uses placeholders supplied by the selected Postman environment; no collection variables |
-| [Local environment](../postman/vulnapp-local.postman_environment.json) | Import and select with the environment collection; contains local URLs and demo credentials |
+| [Literal collection](../fortify/vulnapp.postman_collection.json) | No Postman variables or environment required; edit literal request values directly |
+| [Environment collection](../fortify/vulnapp-environment.postman_collection.json) | Uses placeholders supplied by the selected Postman environment; no collection variables |
+| [Local environment](../fortify/vulnapp-local.postman_environment.json) | Import and select with the environment collection; contains local URLs and demo credentials |
 
 > This application is intentionally insecure. Use an isolated local test instance;
 > never deploy it or expose it on a network.
@@ -25,7 +25,7 @@ from the current collections.
 2. Open the Postman desktop app, or use Postman's web app with its Desktop Agent
    so requests can reach localhost.
 3. Choose **Import** and select
-   [vulnapp.postman_collection.json](../postman/vulnapp.postman_collection.json).
+   [vulnapp.postman_collection.json](../fortify/vulnapp.postman_collection.json).
 4. For the literal collection, edit request URLs and inputs directly if needed.
    Alternatively, import the environment collection and local environment above,
    select **Vulnapp - Local** in the environment selector, and edit its `baseUrl`
@@ -42,7 +42,7 @@ does not start the application and does not require the Postman app or an accoun
 Run the full collection without a global Newman installation:
 
 ```bash
-npx --yes newman@6 run postman/vulnapp.postman_collection.json --timeout-request 10000
+npx --yes newman@6 run fortify/vulnapp.postman_collection.json --timeout-request 10000
 ```
 
 The first run downloads Newman from npm. Alternatively, install Newman globally
@@ -50,27 +50,27 @@ and use `newman` directly:
 
 ```bash
 npm install --global newman@6
-newman run postman/vulnapp.postman_collection.json --timeout-request 10000
+newman run fortify/vulnapp.postman_collection.json --timeout-request 10000
 ```
 
 To run the environment collection, supply its separate environment file:
 
 ```bash
-npx --yes newman@6 run postman/vulnapp-environment.postman_collection.json -e postman/vulnapp-local.postman_environment.json --timeout-request 10000
+npx --yes newman@6 run fortify/vulnapp-environment.postman_collection.json -e fortify/vulnapp-local.postman_environment.json --timeout-request 10000
 ```
 
 Override environment defaults with `--env-var`. For example, if the application
 listens on port 8081, update both the client-facing URL and server-side fetch URL:
 
 ```bash
-npx --yes newman@6 run postman/vulnapp-environment.postman_collection.json -e postman/vulnapp-local.postman_environment.json --env-var "baseUrl=http://localhost:8081" --env-var "fetchUrl=http://127.0.0.1:8081/greet?name=Postman" --timeout-request 10000
+npx --yes newman@6 run fortify/vulnapp-environment.postman_collection.json -e fortify/vulnapp-local.postman_environment.json --env-var "baseUrl=http://localhost:8081" --env-var "fetchUrl=http://127.0.0.1:8081/greet?name=Postman" --timeout-request 10000
 ```
 
 `--env-var` does not change literal values in the original collection. For a targeted
 run that avoids the Utilities folder's server-specific prerequisites, select folders:
 
 ```bash
-npx --yes newman@6 run postman/vulnapp.postman_collection.json --folder "Authentication" --folder "Users and accounts" --folder "Transfers (mutates balances)" --timeout-request 10000
+npx --yes newman@6 run fortify/vulnapp.postman_collection.json --folder "Authentication" --folder "Users and accounts" --folder "Transfers (mutates balances)" --timeout-request 10000
 ```
 
 This targeted command does not cover the utility endpoints. File download is skipped
@@ -83,7 +83,7 @@ error status alone is not a failed test. Transfers still mutate balances on each
 To generate console output and a JUnit XML report for a CI publisher:
 
 ```bash
-npx --yes newman@6 run postman/vulnapp.postman_collection.json --reporters cli,junit --reporter-junit-export target/newman-results.xml --timeout-request 10000
+npx --yes newman@6 run fortify/vulnapp.postman_collection.json --reporters cli,junit --reporter-junit-export target/newman-results.xml --timeout-request 10000
 ```
 
 Newman returns a nonzero exit code for failed assertions or execution errors. Preserve
