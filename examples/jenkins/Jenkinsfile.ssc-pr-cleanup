@@ -103,7 +103,7 @@ pipeline {
                 }
             }
             steps {
-                withCredentials([string(credentialsId: 'ssc-ci-token', variable: 'SSC_TOKEN')]) {
+                withCredentials([string(credentialsId: 'ssc-pr-cleanup-token', variable: 'SSC_TOKEN')]) {
                     sh '''
                         set -eu
                         . "$FORTIFY_ENV_FILE"
