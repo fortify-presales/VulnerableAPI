@@ -616,7 +616,7 @@ docker run --rm -p 8080:8080 vulnerable-app
 
 GHCR packages are private by default; make `vulnerable-app` public under the package settings
 if it should be pulled anonymously. The Railway service `vulnerable-app` is served at
-`https://vulnerable-app-production.up.railway.app`, which
+`https://vulnerable-api-production.up.railway.app`, which
 [the production Postman environment](fortify/vulnapp-prod.postman_environment.json) and
 [api-docs.json](fortify/api-docs.json) reference. Exposing this intentionally vulnerable
 application publicly is only appropriate for isolated, disposable demo environments.
