@@ -73,7 +73,7 @@ class VulnerableAPITests {
             .andExpect(jsonPath("$.info.title").value("VulnerableAPI Demo API"))
             .andExpect(jsonPath("$.info.version").value("1.0.0-SNAPSHOT"))
             .andExpect(jsonPath("$.info.description").isNotEmpty())
-            .andExpect(jsonPath("$.paths.length()").value(12))
+            .andExpect(jsonPath("$.paths.length()").value(13))
             .andExpect(jsonPath("$.paths['/accounts/{username}'].get").exists())
             .andExpect(jsonPath("$.paths['/login'].post").exists())
             .andExpect(jsonPath("$.paths['/encrypt'].post").exists())
@@ -86,6 +86,7 @@ class VulnerableAPITests {
             .andExpect(jsonPath("$.paths['/redirect'].get.parameters[0].name").value("target"))
             .andExpect(jsonPath("$.paths['/transfer'].post").exists())
             .andExpect(jsonPath("$.paths['/users'].get").exists())
+            .andExpect(jsonPath("$.paths['/users/by-email'].get").exists())
             .andExpect(jsonPath("$.paths['/xml'].post.requestBody.content['application/xml']").exists());
         }
 
@@ -124,6 +125,29 @@ class VulnerableAPITests {
         mockMvc.perform(get("/files").param("name", "sample.txt"))
                 .andExpect(status().isOk())
                 .andExpect(content().bytes("Hello from the files endpoint!\n".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    }
+
+
+    @Test
+    void emailLookupReturnsTheMatchingUser() throws Exception {
+        mockMvc.perform(get("/users/by-email").param("email", "alice@example.com"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].USERNAME").value("alice"))
+                .andExpect(jsonPath("$[0].EMAIL").value("alice@example.com"))
+                .andExpect(jsonPath("$[0].PASSWORD_HASH").doesNotExist());
+        mockMvc.perform(get("/users/by-email").param("email", "unknown@example.com"))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+    }
+
+    @Test
+    void emailLookupIntentionallyAllowsSqlInjection() throws Exception {
+        mockMvc.perform(get("/users/by-email").param("email", "' OR '1'='1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[*].USERNAME",
+                        org.hamcrest.Matchers.containsInAnyOrder("alice", "bob", "carol")));
     }
 
     @Test

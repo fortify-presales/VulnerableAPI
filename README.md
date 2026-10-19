@@ -8,6 +8,7 @@ Java project with Jenkins/GitHub Actions build and ScanCentral integration via f
 
 | Vulnerability | Location |
 |---|---|
+| SQL Injection (new PR demo dataflow) | `web/UserController.java` (`GET /users/by-email?email=`) |
 | SQL Injection | `web/UserController.java` (`GET /users?name=`) |
 | Command Injection | `web/CommandController.java` (`GET /ping?host=`) |
 | Path Traversal | `web/FileController.java` (`GET /files?name=`) |
@@ -63,6 +64,36 @@ Results depend on SSC issue matching, scan policy, and rulepack configuration.
 The script refuses to run on `main` or `master`, validates insertion points before
 writing, and leaves an already-applied demo unchanged. It does not create branches,
 commit, push, or delete anything. Keep the intentionally vulnerable application local.
+
+## New SQL injection PR demo
+
+`GET /users/by-email?email=` intentionally concatenates the email parameter into
+SQL in `UserController.findUsersByEmail`. This is a separate dataflow from the
+existing `/users` vulnerability. Never expose this application publicly.
+
+With the application running locally:
+
+```bash
+curl --get --data-urlencode "email=alice@example.com" http://localhost:8080/users/by-email
+curl --get --data-urlencode "email=' OR '1'='1" http://localhost:8080/users/by-email
+```
+
+The normal request returns Alice; the injection returns all three seeded users.
+Run `mvn -B -Dtest=VulnerableAPITests test` to verify the demo.
+
+For a new-then-removed finding demo:
+
+1. Establish the SSC baseline scan before adding this endpoint. The PR comment
+   compares successive scans in the same SSC PR version, not arbitrary Git commits.
+2. Apply the demo, commit and push it, then wait for the PR scan to finish.
+   Look for a new SQL Injection finding in `findUsersByEmail`. Results depend on
+   SSC issue matching, scan policy, and rulepack configuration.
+3. Only after that scan, replace the concatenated query with
+   `jdbcTemplate.queryForList("SELECT id, username, email FROM users WHERE email = ?", email)`.
+   Update `emailLookupIntentionallyAllowsSqlInjection` to expect an empty array
+   and rename it to describe the fixed behavior.
+4. Commit and push the fix separately, then wait for another scan. The email
+   finding should be removed; the original `/users` finding remains.
 
 ## Build locally
 
