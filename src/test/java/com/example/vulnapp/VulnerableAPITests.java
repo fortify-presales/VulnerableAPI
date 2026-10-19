@@ -73,7 +73,7 @@ class VulnerableAPITests {
             .andExpect(jsonPath("$.info.title").value("VulnerableAPI Demo API"))
             .andExpect(jsonPath("$.info.version").value("1.0.0-SNAPSHOT"))
             .andExpect(jsonPath("$.info.description").isNotEmpty())
-            .andExpect(jsonPath("$.paths.length()").value(12))
+            .andExpect(jsonPath("$.paths.length()").value(13))
             .andExpect(jsonPath("$.paths['/accounts/{username}'].get").exists())
             .andExpect(jsonPath("$.paths['/login'].post").exists())
             .andExpect(jsonPath("$.paths['/encrypt'].post").exists())
@@ -86,6 +86,7 @@ class VulnerableAPITests {
             .andExpect(jsonPath("$.paths['/redirect'].get.parameters[0].name").value("target"))
             .andExpect(jsonPath("$.paths['/transfer'].post").exists())
             .andExpect(jsonPath("$.paths['/users'].get").exists())
+            .andExpect(jsonPath("$.paths['/users/safe'].get").exists())
             .andExpect(jsonPath("$.paths['/xml'].post.requestBody.content['application/xml']").exists());
         }
 
@@ -124,6 +125,41 @@ class VulnerableAPITests {
         mockMvc.perform(get("/files").param("name", "sample.txt"))
                 .andExpect(status().isOk())
                 .andExpect(content().bytes("Hello from the files endpoint!\n".getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    void bothUserLookupsReturnTheSameUserForAnOrdinaryName() throws Exception {
+        for (String endpoint : new String[] {"/users", "/users/safe"}) {
+            mockMvc.perform(get(endpoint).param("name", "alice"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.length()").value(1))
+                    .andExpect(jsonPath("$[0].USERNAME").value("alice"))
+                    .andExpect(jsonPath("$[0].EMAIL").value("alice@example.com"))
+                    .andExpect(jsonPath("$[0].PASSWORD_HASH").doesNotExist());
+        }
+    }
+
+    @Test
+    void sqlInjectionReturnsAllUsersOnlyInTheVulnerableLookup() throws Exception {
+        String injectedName = "' OR '1'='1";
+
+        mockMvc.perform(get("/users").param("name", injectedName))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[*].USERNAME",
+                        org.hamcrest.Matchers.containsInAnyOrder("alice", "bob", "carol")));
+        mockMvc.perform(get("/users/safe").param("name", injectedName))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+    }
+
+    @Test
+    void bothUserLookupsReturnNoMatchesForUnknownNames() throws Exception {
+        for (String endpoint : new String[] {"/users", "/users/safe"}) {
+            mockMvc.perform(get(endpoint).param("name", "unknown-user"))
+                    .andExpect(status().isOk())
+                    .andExpect(content().json("[]"));
+        }
     }
 
     @Test

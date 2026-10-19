@@ -9,6 +9,7 @@ Java project with Jenkins/GitHub Actions build and ScanCentral integration via f
 | Vulnerability | Location |
 |---|---|
 | SQL Injection | `web/UserController.java` (`GET /users?name=`) |
+| Parameterized SQL comparison (not intentionally SQL-injectable) | `web/UserController.java` (`GET /users/safe?name=`) |
 | Command Injection | `web/CommandController.java` (`GET /ping?host=`) |
 | Path Traversal | `web/FileController.java` (`GET /files?name=`) |
 | Reflected XSS | `web/GreetingController.java` (`GET /greet?name=`) |
@@ -33,6 +34,52 @@ username belongs to that principal. Log in through `/login` and send the returne
 `Authorization: Bearer <token>` to supply the principal. An authenticated user can change
 the username in the URL to read another user's email and balance. This is an intentional IDOR test case,
 not a guarantee that either Fortify analyzer will report it.
+
+## SQL injection scanning demo
+
+`UserController` provides a vulnerable lookup and a parameterized comparison using
+the same seeded users:
+
+| Endpoint | `name=alice` | `name=' OR '1'='1` |
+|---|---|---|
+| `/users` (intentionally vulnerable) | Alice only | All three seeded users |
+| `/users/safe` (parameterized) | Alice only | Empty array |
+
+The vulnerable method concatenates the HTTP `name` parameter into a SQL string and
+passes it to `JdbcTemplate.queryForList`. In Fortify, follow the dataflow from the
+request parameter to that database call. The comparison method uses a `?`
+placeholder and binds the name separately, so input cannot change the SQL structure.
+It demonstrates SQL injection prevention only; it does not add access control.
+
+With the application running **locally only**, compare these read-only requests:
+
+```bash
+curl --get --data-urlencode "name=alice" http://localhost:8080/users
+curl --get --data-urlencode "name=alice" http://localhost:8080/users/safe
+curl --get --data-urlencode "name=' OR '1'='1" http://localhost:8080/users
+curl --get --data-urlencode "name=' OR '1'='1" http://localhost:8080/users/safe
+```
+
+To scan locally with a licensed Fortify SAST installation and Java rules installed,
+run the following from the repository root. This translates Java sources directly,
+without requiring the Fortify Maven plugin:
+
+```bash
+mvn -B -DskipTests compile dependency:build-classpath -Dmdep.outputFile=target/fortify-demo-classpath.txt
+sourceanalyzer -b vulnerableapi-sql-demo -clean
+sourceanalyzer -b vulnerableapi-sql-demo -source 17 \
+  -cp "$(cat target/fortify-demo-classpath.txt)" src/main/java
+sourceanalyzer -b vulnerableapi-sql-demo -scan -f target/sql-injection-demo.fpr
+```
+
+Open the FPR in Fortify Audit Workbench and filter for **SQL Injection**.
+A local Fortify SAST 26.4 scan verified a finding in `findUsers` and no SQL injection
+finding in `findUsersSafely`; results can vary with rulepacks and configuration.
+The scan also includes the application's other intentional vulnerabilities.
+SAST does not require starting the application or sending these requests.
+
+The integration tests verify ordinary lookups, unknown names, and the injection
+comparison. Run them with `mvn -B -Dtest=VulnerableAPITests test`.
 
 ## Build locally
 

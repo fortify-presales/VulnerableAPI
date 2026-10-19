@@ -31,4 +31,16 @@ public class UserController {
         String sql = "SELECT id, username, email FROM users WHERE username = '" + name + "'";
         return jdbcTemplate.queryForList(sql);
     }
+
+    @GetMapping("/users/safe")
+    @Operation(summary = "Find users - parameterized SQL comparison",
+        description = "Binds the supplied name as a SQL parameter rather than concatenating it. "
+            + "Compare with /users: SQL injection input is treated as a literal username here. "
+            + "This demonstrates SQL injection prevention, not authentication or authorization.")
+    public List<Map<String, Object>> findUsersSafely(
+        @Parameter(description = "Username to look up in the seeded users table.",
+            schema = @Schema(defaultValue = "alice")) @RequestParam String name) {
+        return jdbcTemplate.queryForList(
+            "SELECT id, username, email FROM users WHERE username = ?", name);
+    }
 }
