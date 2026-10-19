@@ -26,3 +26,6 @@ fortifypackage.zip
 VulnerableAPI-main.zip
 debricked.fingerprints.txt
 maven.debricked.lock
+aviator-demos.sh
+.gitignore
+faa.zip
