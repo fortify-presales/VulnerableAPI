@@ -31,4 +31,16 @@ public class UserController {
         String sql = "SELECT id, username, email FROM users WHERE username = '" + name + "'";
         return jdbcTemplate.queryForList(sql);
     }
+
+    // Intentional: separate SQL injection dataflow for the PR scanning demo.
+    @GetMapping("/users/by-email")
+    @Operation(summary = "Find users by email - SQL injection",
+        description = "Intentionally concatenates the supplied email into SQL without parameterization. "
+            + "This separate lookup introduces a new SQL injection finding for the PR scanning demo.")
+    public List<Map<String, Object>> findUsersByEmail(
+        @Parameter(description = "Email address to look up in the seeded users table.",
+            schema = @Schema(defaultValue = "alice@example.com")) @RequestParam String email) {
+        String sql = "SELECT id, username, email FROM users WHERE email = '" + email + "'";
+        return jdbcTemplate.queryForList(sql);
+    }
 }
