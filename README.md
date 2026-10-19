@@ -1,4 +1,4 @@
-# VulnerableApp
+# VulnerableAPI
 Java project with Jenkins/GitHub Actions build and ScanCentral integration via fcli
 
 > **Warning:** This application is intentionally insecure and exists only to exercise
@@ -337,7 +337,7 @@ quota/access using an administrative onboarding process. SSC application-version
 does not create the Aviator application. With an authorized Aviator administrator configuration:
 
 ```bash
-fcli aviator app create "VulnerableApp-Jenkins"
+fcli aviator app create "VulnerableAPI-Jenkins"
 ```
 
 Application creation alone does not establish the required quota or user access. Keep
@@ -346,8 +346,8 @@ contents as the Jenkins Secret text credential `aviator-token`; do not use a `fi
 Configure `AVIATOR_URL` as a non-secret endpoint, or pass `aviatorUrl` to the shared step.
 
 For `fcli action run ci`, `AVIATOR_APP` defaults to the SSC application name, without the
-version suffix. For example, `VulnerableApp-Jenkins:main` maps to the Aviator application
-`VulnerableApp-Jenkins`. If the name differs, set `AVIATOR_APP` in the job/folder environment
+version suffix. For example, `VulnerableAPI-Jenkins:main` maps to the Aviator application
+`VulnerableAPI-Jenkins`. If the name differs, set `AVIATOR_APP` in the job/folder environment
 or pipeline environment block:
 
 ```groovy
@@ -381,7 +381,7 @@ Do not place the token in source control, plain global environment variables, lo
 
 The pipeline explicitly passes `--branch-name` through `AVIATOR_REMEDIATIONS_EXTRA_OPTS`.
 Its destination is `aviator/remediations/<sanitized BUILD_TAG>`, for example
-`aviator/remediations/VulnerableApp-Jenkins_main-42`; if `BUILD_TAG` is unavailable,
+`aviator/remediations/VulnerableAPI_main-42`; if `BUILD_TAG` is unavailable,
 it falls back to `aviator/remediations/build-<BUILD_NUMBER>`. The destination is logged before
 the CI action runs. No branch is pushed if there are no remediation changes to commit.
 
@@ -538,24 +538,24 @@ and [Warnings NG pipeline steps](https://www.jenkins.io/doc/pipeline/steps/warni
 ## GitHub Actions
 
 The GitHub Actions workflows in [.github/workflows](.github/workflows) are equivalents of
-the Jenkins pipelines for the `fortify-presales/VulnerableApp` repository. Results are
-stored in SSC under the separate application `VulnerableApp-GHA`, so Jenkins
-(`VulnerableApp-Jenkins`) and GitHub Actions results never mix.
+the Jenkins pipelines for the `fortify-presales/VulnerableAPI` repository. Results are
+stored in SSC under the separate application `VulnerableAPI-GitHub`, so Jenkins
+(`VulnerableAPI-Jenkins`) and GitHub Actions results never mix.
 
 | Workflow | Jenkins equivalent | Purpose |
 |---|---|---|
 | [build.yml](.github/workflows/build.yml) | `Build` stage | `mvn -B clean verify`, uploads the jar and test reports, builds the Docker image and pushes `ghcr.io/fortify-presales/vulnerable-app` (`latest` and commit SHA) on `main` |
 | [scancentral.yml](.github/workflows/scancentral.yml) | `fortifyCi` / `Security` stage | ScanCentral SAST and Debricked SCA via `fortify/github-action@v3`, optional DAST, Aviator, policy check, PR comment and GitHub code scanning export |
-| [ssc-pr-cleanup.yml](.github/workflows/ssc-pr-cleanup.yml) | [Jenkinsfile.ssc-pr-cleanup](examples/jenkins/Jenkinsfile.ssc-pr-cleanup) | Deletes `VulnerableApp-GHA:PR-<n>` when a pull request is closed |
+| [ssc-pr-cleanup.yml](.github/workflows/ssc-pr-cleanup.yml) | [Jenkinsfile.ssc-pr-cleanup](examples/jenkins/Jenkinsfile.ssc-pr-cleanup) | Deletes `VulnerableAPI-GitHub:PR-<n>` when a pull request is closed |
 | [deploy-railway.yml](.github/workflows/deploy-railway.yml) | none | Deploys the Dockerfile build to the Railway service `vulnerable-app` after a successful `main` build |
 
 ### SSC Application Versions
 
 | Trigger | SSC application version | Scan policy | Copied from |
 |---|---|---|---|
-| Push to `main` | `VulnerableApp-GHA:main` | `security` | - |
-| Push to `feature/x` | `VulnerableApp-GHA:feature/x` | `devops` | `VulnerableApp-GHA:main` |
-| Pull request #42 | `VulnerableApp-GHA:PR-42` | `devops` for `feature/*` heads, otherwise `security` | `VulnerableApp-GHA:main` for `feature/*` heads |
+| Push to `main` | `VulnerableAPI-GitHub:main` | `security` | - |
+| Push to `feature/x` | `VulnerableAPI-GitHub:feature/x` | `devops` | `VulnerableAPI-GitHub:main` |
+| Pull request #42 | `VulnerableAPI-GitHub:PR-42` | `devops` for `feature/*` heads, otherwise `security` | `VulnerableAPI-GitHub:main` for `feature/*` heads |
 
 The rules match `fortifyCi`: `devops` is rejected on non-feature branches, the issue template
 is applied when a version is created, and fork pull requests are skipped because repository
@@ -585,7 +585,7 @@ Configure these under **Settings > Secrets and variables > Actions**:
 | `AVIATOR_URL` | Variable | No | Aviator URL |
 | `AVIATOR_TOKEN` | Secret | No | Aviator JWT (Jenkins `aviator-token`) |
 | `GIT_PUSH_TOKEN` | Secret | No | Fine-grained PAT with Contents and Pull requests write, used by Aviator remediations (Jenkins `git-push-token`) |
-| `SSC_PR_CLEANUP_TOKEN` | Secret | For cleanup | Separate SSC token allowed to delete versions of `VulnerableApp-GHA` (Jenkins `ssc-pr-cleanup-token`) |
+| `SSC_PR_CLEANUP_TOKEN` | Secret | For cleanup | Separate SSC token allowed to delete versions of `VulnerableAPI-GitHub` (Jenkins `ssc-pr-cleanup-token`) |
 | `SSC_CLEANUP_MERGED_ONLY` | Variable | No | `true` deletes only merged pull-request versions |
 | `RAILWAY_TOKEN` | Secret | For deploy | Railway project token |
 | `RAILWAY_SERVICE` | Variable | No | Railway service; defaults to `vulnerable-app` |
@@ -594,7 +594,7 @@ The issue template must exist in SSC. Aviator needs the same one-time onboarding
 using the GitHub Actions application name:
 
 ```bash
-fcli aviator app create "VulnerableApp-GHA"
+fcli aviator app create "VulnerableAPI-GitHub"
 ```
 
 On GitHub, Aviator remediations are committed to a new branch and a pull request is opened
@@ -632,8 +632,8 @@ instance (GitHub Connect or a synced mirror).
 ### First-Run Verification
 
 1. Configure `SSC_URL`, `SSC_TOKEN`, and `SC_SAST_TOKEN`, then run the scan workflow manually
-   on `main` with optional integrations off; confirm `VulnerableApp-GHA:main` is created and
+   on `main` with optional integrations off; confirm `VulnerableAPI-GitHub:main` is created and
    the job summary and code scanning alerts appear.
 2. Add `DEBRICKED_TOKEN` and re-run; confirm Debricked results are uploaded to SSC.
-3. Open a pull request from a `feature/*` branch; confirm `VulnerableApp-GHA:PR-<n>` is
+3. Open a pull request from a `feature/*` branch; confirm `VulnerableAPI-GitHub:PR-<n>` is
    copied from `main` and a PR comment is posted. Close it and confirm cleanup.

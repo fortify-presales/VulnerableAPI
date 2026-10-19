@@ -50,11 +50,11 @@ on:
         default: true
 
 env:
-  SSC_APP_NAME: VulnerableApp-GHA
+  SSC_APP_NAME: VulnerableAPI-GitHub
 
 concurrency:
   # Shared with ssc-pr-cleanup.yml so a scan and cleanup never touch the same SSC version at once.
-  group: ssc-VulnerableApp-GHA-${{ github.event_name == 'pull_request' && format('PR-{0}', github.event.pull_request.number) || github.ref_name }}
+  group: ssc-VulnerableAPI-GitHub-${{ github.event_name == 'pull_request' && format('PR-{0}', github.event.pull_request.number) || github.ref_name }}
   cancel-in-progress: false
 
 jobs:

@@ -6,12 +6,12 @@ must not execute Jenkinsfile code from the PR being closed.
 
 The example Jenkinsfile is [Jenkinsfile.ssc-pr-cleanup](../examples/jenkins/Jenkinsfile.ssc-pr-cleanup). It listens for GitHub
 `pull_request` events with action `closed`, then maps the PR number to an SSC version such as
-`VulnerbleApp-Jenkins:PR-42`.
+`VulnerableAPI-Jenkins:PR-42`.
 
-The GitHub repository is `fortify-presales/VulnerableApp-Jenkins`; the existing SSC
-application name remains `VulnerableApp-Jenkins`. Keep `SSC_APP_NAME` aligned
-with the scan jobs rather than renaming it to match GitHub. After deploying the
-updated cleanup Jenkinsfile, run the job once to apply the renamed-repository filter.
+The GitHub repository is `fortify-presales/VulnerableAPI`, and the Jenkins SSC
+application name is `VulnerableAPI-Jenkins`. Keep `SSC_APP_NAME` aligned with the scan jobs.
+After deploying the updated cleanup Jenkinsfile, run the job once to apply the
+repository filter.
 
 ## Important: Match the Existing Version Name
 
@@ -38,7 +38,7 @@ the example so cleanup targets exactly the version created by the scan job.
    Keep the Jenkins trigger token out of source control and do not expose an unauthenticated trigger endpoint.
 5. Run the job once so Jenkins applies the Pipeline trigger configuration. The trigger extracts `action`, PR
    `number`, base repository full name, and `pull_request.merged`; its regexp filter targets closed PRs for
-   `fortify-presales/VulnerableApp-Jenkins`. The Jenkinsfile also ignores non-closed payloads that reach the
+   `fortify-presales/VulnerableAPI`. The Jenkinsfile also ignores non-closed payloads that reach the
    job and validates the repository and PR number before contacting SSC.
 
 The Generic Webhook Trigger token can cause the job to run with Jenkins `SYSTEM` authority. Treat the endpoint
@@ -61,7 +61,7 @@ To run cleanup as an SSC administrator:
    available to jobs in that folder and its subfolders, not exclusively to this job. Keep untrusted PR jobs out
    of the folder and keep the cleanup pipeline definition on protected `main`.
 4. Deploy the updated Jenkinsfile and run **Build with Parameters** with `PR_ACTION=closed`,
-   `BASE_REPO=fortify-presales/VulnerableApp-Jenkins`, a known `PR_NUMBER`, and `DRY_RUN` checked. Confirm the
+   `BASE_REPO=fortify-presales/VulnerableAPI`, a known `PR_NUMBER`, and `DRY_RUN` checked. Confirm the
    expected SSC version is returned before allowing deletion.
 
 The SSC identity comes from the token used by `fcli ssc session login`, not from the Jenkins user who starts

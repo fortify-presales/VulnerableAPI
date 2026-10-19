@@ -23,7 +23,7 @@ pipeline {
             printContributedVariables: false,
             printPostContent: false,
             regexpFilterText: '$PR_ACTION:$BASE_REPO',
-            regexpFilterExpression: '^closed:fortify-presales/VulnerableApp-Jenkins$'
+            regexpFilterExpression: '^closed:fortify-presales/VulnerableAPI$'
         )
     }
 
@@ -32,8 +32,8 @@ pipeline {
     }
 
     environment {
-        SSC_APP_NAME = 'VulnerableApp-Jenkins'
-        EXPECTED_BASE_REPO = 'fortify-presales/VulnerableApp-Jenkins'
+        SSC_APP_NAME = 'VulnerableAPI-Jenkins'
+        EXPECTED_BASE_REPO = 'fortify-presales/VulnerableAPI'
         SSC_VERSION_PREFIX = 'PR-'
         FORTIFY_SETUP = '@fortify/setup@2'
         FCLI_VERSION = 'v3.28.1'

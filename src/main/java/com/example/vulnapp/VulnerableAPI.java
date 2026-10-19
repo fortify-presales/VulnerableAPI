@@ -12,7 +12,7 @@ import io.swagger.v3.oas.models.media.XML;
 
 @SpringBootApplication
 @OpenAPIDefinition(info = @Info(
-    title = "VulnerableApp Demo API",
+    title = "VulnerableAPI Demo API",
     version = "1.0.0-SNAPSHOT",
     description = "An intentionally vulnerable Spring Boot API for Fortify security scanning, "
         + "security training, and controlled API testing. It includes user and account lookups, "
@@ -29,7 +29,7 @@ import io.swagger.v3.oas.models.media.XML;
     @SecurityScheme(name = "bearerAuth", type = SecuritySchemeType.HTTP, scheme = "bearer",
         description = "Paste the plain-text token returned by POST /login, without the Bearer prefix. "
             + "Demo tokens expire after one hour or an app restart and use intentionally weak randomness.")
-public class VulnerableApp {
+public class VulnerableAPI {
 
     @Bean
     public OpenApiCustomizer xmlRequestExample() {
@@ -38,6 +38,6 @@ public class VulnerableApp {
     }
 
     public static void main(String[] args) {
-        SpringApplication.run(VulnerableApp.class, args);
+        SpringApplication.run(VulnerableAPI.class, args);
     }
 }

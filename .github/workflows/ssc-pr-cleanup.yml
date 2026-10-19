@@ -19,12 +19,12 @@ permissions:
   contents: read
 
 env:
-  SSC_APP_NAME: VulnerableApp-GHA
+  SSC_APP_NAME: VulnerableAPI-GitHub
   SSC_VERSION_PREFIX: PR-
 
 concurrency:
   # Shared with scancentral.yml so cleanup never races a scan of the same PR version.
-  group: ssc-VulnerableApp-GHA-PR-${{ github.event.pull_request.number || inputs.pr_number }}
+  group: ssc-VulnerableAPI-GitHub-PR-${{ github.event.pull_request.number || inputs.pr_number }}
   cancel-in-progress: false
 
 jobs:
