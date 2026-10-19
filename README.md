@@ -34,6 +34,36 @@ username belongs to that principal. Log in through `/login` and send the returne
 the username in the URL to read another user's email and balance. This is an intentional IDOR test case,
 not a guarantee that either Fortify analyzer will report it.
 
+## Repeatable PR scanning demo
+
+[scripts/apply_sql_demo.py](scripts/apply_sql_demo.py) adds a separate, intentionally
+SQL-injectable email lookup, integration tests, and a walkthrough to a demo branch.
+Checking in the script does not activate the endpoint. Python 3 and Git are required.
+
+After this script is committed to `main`, create a fresh branch:
+
+```bash
+git switch -c feature/sql-injection-demo
+```
+
+Push a baseline change and open a PR targeting `main`. Wait for its initial Fortify
+scan to finish before applying the demo, so the next scan can compare results in
+the same SSC `PR-<number>` version.
+
+```bash
+python3 scripts/apply_sql_demo.py --check
+python3 scripts/apply_sql_demo.py
+mvn -B -Dtest=VulnerableAPITests test
+```
+
+Commit and push the generated changes, then wait for the PR scan. Follow the
+generated walkthrough to fix the query in a subsequent commit and scan again.
+Results depend on SSC issue matching, scan policy, and rulepack configuration.
+
+The script refuses to run on `main` or `master`, validates insertion points before
+writing, and leaves an already-applied demo unchanged. It does not create branches,
+commit, push, or delete anything. Keep the intentionally vulnerable application local.
+
 ## Build locally
 
 ```bash
